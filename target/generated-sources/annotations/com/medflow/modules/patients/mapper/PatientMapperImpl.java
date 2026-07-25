@@ -1,5 +1,7 @@
 package com.medflow.modules.patients.mapper;
 
+import com.medflow.modules.patients.api.PatientStatus;
+import com.medflow.modules.patients.api.PatientSummary;
 import com.medflow.modules.patients.api.response.PatientResponse;
 import com.medflow.modules.patients.domain.entity.Patient;
 import java.time.Instant;
@@ -10,8 +12,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-07-25T17:41:01+0530",
-    comments = "version: 1.6.3, compiler: javac, environment: Java 21.0.12 (Oracle Corporation)"
+    date = "2026-07-25T19:48:22+0530",
+    comments = "version: 1.6.3, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class PatientMapperImpl implements PatientMapper {
@@ -28,7 +30,12 @@ public class PatientMapperImpl implements PatientMapper {
         LocalDate dateOfBirth = null;
         String gender = null;
         String email = null;
+        String phone = null;
+        String bloodGroup = null;
+        String address = null;
+        PatientStatus status = null;
         Instant createdAt = null;
+        Instant updatedAt = null;
 
         id = patient.getId();
         firstName = patient.getFirstName();
@@ -36,10 +43,32 @@ public class PatientMapperImpl implements PatientMapper {
         dateOfBirth = patient.getDateOfBirth();
         gender = patient.getGender();
         email = patient.getEmail();
+        phone = patient.getPhone();
+        bloodGroup = patient.getBloodGroup();
+        address = patient.getAddress();
+        status = patient.getStatus();
         createdAt = patient.getCreatedAt();
+        updatedAt = patient.getUpdatedAt();
 
-        PatientResponse patientResponse = new PatientResponse( id, firstName, lastName, dateOfBirth, gender, email, createdAt );
+        PatientResponse patientResponse = new PatientResponse( id, firstName, lastName, dateOfBirth, gender, email, phone, bloodGroup, address, status, createdAt, updatedAt );
 
         return patientResponse;
+    }
+
+    @Override
+    public PatientSummary toSummary(Patient patient) {
+        if ( patient == null ) {
+            return null;
+        }
+
+        UUID id = null;
+        String fullName = null;
+
+        id = patient.getId();
+        fullName = patient.getFullName();
+
+        PatientSummary patientSummary = new PatientSummary( id, fullName );
+
+        return patientSummary;
     }
 }
