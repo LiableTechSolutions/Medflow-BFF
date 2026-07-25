@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: medflow-ai
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/medflow}
+    username: ${DB_USERNAME:medflow}
+    password: ${DB_PASSWORD:medflow}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration/patients
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+springdoc:
+  api-docs.path: /api-docs
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true
+logging:
+  pattern.level: "%5p [traceId=%X{traceId:-}]"
