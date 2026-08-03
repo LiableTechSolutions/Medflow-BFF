@@ -7,9 +7,9 @@ import com.medflow.modules.pharmacy.api.request.UpdateMedicationRequest;
 import com.medflow.modules.pharmacy.api.response.MedicationResponse;
 import com.medflow.shared.api.ApiResponse;
 import com.medflow.shared.api.PageResponse;
+import com.medflow.shared.security.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,50 +27,56 @@ import org.springframework.web.bind.annotation.RestController;
 class MedicationController {
 
   private final MedicationService service;
+  private final TenantContext tenantContext;
 
-  MedicationController(MedicationService service) {
+  MedicationController(MedicationService service, TenantContext tenantContext) {
     this.service = service;
+    this.tenantContext = tenantContext;
   }
 
   @PostMapping
-  @Operation(summary = "Add medication", description = "Registers a medication in the pharmacy catalog.")
+  @Operation(summary = "Add medication",
+      description = "Registers a medication in the pharmacy catalogue.")
   ResponseEntity<ApiResponse<MedicationResponse>> create(
       @Valid @RequestBody CreateMedicationRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.success("Medication created successfully", service.create(request)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+        "Medication created successfully", service.create(tenantContext.hospitalId(), request)));
   }
 
   @GetMapping
-  @Operation(summary = "List medications", description = "Searches the catalog; lowStockOnly filters items at or below reorder level.")
+  @Operation(summary = "List medications",
+      description = "Searches the catalogue; lowStockOnly returns items at or below reorder level.")
   ApiResponse<PageResponse<MedicationResponse>> search(
       @RequestParam(required = false) String query,
       @RequestParam(defaultValue = "false") boolean lowStockOnly,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
     return ApiResponse.success("Medications retrieved successfully",
-        service.search(query, lowStockOnly, page, size));
+        service.search(tenantContext.hospitalId(), query, lowStockOnly, page, size));
   }
 
   @GetMapping("/{medicationId}")
   @Operation(summary = "Get medication", description = "Returns a medication by identifier.")
-  ApiResponse<MedicationResponse> find(@PathVariable UUID medicationId) {
+  ApiResponse<MedicationResponse> find(@PathVariable Long medicationId) {
     return ApiResponse.success("Medication retrieved successfully",
-        service.findById(medicationId));
+        service.findById(tenantContext.hospitalId(), medicationId));
   }
 
   @PutMapping("/{medicationId}")
-  @Operation(summary = "Update medication", description = "Updates catalog details and reorder level.")
-  ApiResponse<MedicationResponse> update(@PathVariable UUID medicationId,
+  @Operation(summary = "Update medication",
+      description = "Updates catalogue details and the reorder level.")
+  ApiResponse<MedicationResponse> update(@PathVariable Long medicationId,
       @Valid @RequestBody UpdateMedicationRequest request) {
     return ApiResponse.success("Medication updated successfully",
-        service.update(medicationId, request));
+        service.update(tenantContext.hospitalId(), medicationId, request));
   }
 
   @PatchMapping("/{medicationId}/stock")
-  @Operation(summary = "Adjust stock", description = "Restocks (+) or dispenses (−); low stock raises a workspace alert.")
-  ApiResponse<MedicationResponse> adjustStock(@PathVariable UUID medicationId,
+  @Operation(summary = "Adjust stock",
+      description = "Restocks (+) or dispenses (−); crossing the reorder level raises an alert.")
+  ApiResponse<MedicationResponse> adjustStock(@PathVariable Long medicationId,
       @Valid @RequestBody AdjustStockRequest request) {
     return ApiResponse.success("Medication stock adjusted successfully",
-        service.adjustStock(medicationId, request));
+        service.adjustStock(tenantContext.hospitalId(), medicationId, request));
   }
 }

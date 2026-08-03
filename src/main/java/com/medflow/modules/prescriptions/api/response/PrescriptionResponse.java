@@ -3,17 +3,20 @@ package com.medflow.modules.prescriptions.api.response;
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 public record PrescriptionResponse(
-    UUID id,
-    UUID patientId,
+    Long id,
+    Long hospitalId,
+    Long appointmentId,
+    Long patientId,
     String patientName,
-    UUID doctorId,
+    Long doctorId,
     String doctorName,
+    String diagnosis,
+    List<PrescriptionItemResponse> medicines,
+    boolean digitallySigned,
+    Instant signedAt,
     PrescriptionStatus status,
-    String notes,
-    List<PrescriptionItemResponse> items,
-    Instant issuedAt,
+    Instant createdAt,
     Instant updatedAt) {
 }

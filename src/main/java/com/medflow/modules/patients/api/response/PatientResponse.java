@@ -1,21 +1,28 @@
 package com.medflow.modules.patients.api.response;
 
-import com.medflow.modules.patients.api.PatientStatus;
+import com.medflow.shared.domain.AccountStatus;
+import com.medflow.shared.domain.Gender;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.UUID;
 
 public record PatientResponse(
-    UUID id,
+    Long id,
+    Long hospitalId,
+    Long userId,
+    String patientCode,
     String firstName,
     String lastName,
+    String fullName,
+    Gender gender,
     LocalDate dateOfBirth,
-    String gender,
-    String email,
-    String phone,
+    Integer age,
     String bloodGroup,
+    String phone,
+    String email,
     String address,
-    PatientStatus status,
+    String emergencyContactName,
+    String emergencyContactPhone,
+    AccountStatus status,
     Instant createdAt,
     Instant updatedAt) {
 }

@@ -1,9 +1,7 @@
 package com.medflow.modules.prescriptions.api.response;
 
-import java.util.UUID;
-
+/** One medication line, as stored inside {@code medicines_json}. */
 public record PrescriptionItemResponse(
-    UUID id,
     String medicationName,
     String dosage,
     String frequency,

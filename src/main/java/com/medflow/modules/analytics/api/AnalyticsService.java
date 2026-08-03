@@ -8,8 +8,8 @@ import java.util.List;
 public interface AnalyticsService {
 
   /** The KPI cards on the dashboard, computed for "today" in UTC. */
-  DashboardSummaryResponse getDashboardSummary();
+  DashboardSummaryResponse getDashboardSummary(Long hospitalId);
 
   /** Daily visit counts for the activity chart; {@code days} ending today, inclusive. */
-  List<DailyActivityResponse> getActivity(int days);
+  List<DailyActivityResponse> getActivity(Long hospitalId, int days);
 }

@@ -1,7 +1,6 @@
 package com.medflow.modules.users.api.request;
 
-import com.medflow.modules.users.api.UserRole;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 
-public record ChangeRoleRequest(@NotNull UserRole role) {
+public record ChangeRoleRequest(@NotBlank String roleCode) {
 }

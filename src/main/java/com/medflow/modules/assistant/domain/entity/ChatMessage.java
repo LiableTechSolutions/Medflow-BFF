@@ -5,25 +5,28 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
-@Table(name = "chat_messages", indexes =
-    @Index(name = "idx_chat_messages_thread", columnList = "user_id, conversation_id, created_at"))
+@Table(name = "chat_messages")
 public class ChatMessage {
 
   @Id
-  private UUID id;
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(name = "hospital_id", nullable = false)
+  private Long hospitalId;
 
   @Column(name = "user_id", nullable = false)
-  private UUID userId;
+  private Long userId;
 
-  @Column(name = "conversation_id", nullable = false)
-  private UUID conversationId;
+  @Column(name = "conversation_id", nullable = false, length = 36)
+  private String conversationId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
@@ -38,8 +41,9 @@ public class ChatMessage {
   protected ChatMessage() {
   }
 
-  public ChatMessage(UUID userId, UUID conversationId, ChatRole role, String content) {
-    this.id = UUID.randomUUID();
+  public ChatMessage(Long hospitalId, Long userId, String conversationId, ChatRole role,
+      String content) {
+    this.hospitalId = hospitalId;
     this.userId = userId;
     this.conversationId = conversationId;
     this.role = role;
@@ -47,9 +51,10 @@ public class ChatMessage {
     this.createdAt = Instant.now();
   }
 
-  public UUID getId() { return id; }
-  public UUID getUserId() { return userId; }
-  public UUID getConversationId() { return conversationId; }
+  public Long getId() { return id; }
+  public Long getHospitalId() { return hospitalId; }
+  public Long getUserId() { return userId; }
+  public String getConversationId() { return conversationId; }
   public ChatRole getRole() { return role; }
   public String getContent() { return content; }
   public Instant getCreatedAt() { return createdAt; }

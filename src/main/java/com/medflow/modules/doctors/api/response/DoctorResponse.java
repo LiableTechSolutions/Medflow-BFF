@@ -1,20 +1,27 @@
 package com.medflow.modules.doctors.api.response;
 
-import com.medflow.modules.doctors.api.DoctorAvailability;
+import com.medflow.shared.domain.AccountStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 
 public record DoctorResponse(
-    UUID id,
+    Long id,
+    Long hospitalId,
+    Long userId,
+    String doctorCode,
+    String firstName,
+    String lastName,
     String fullName,
     String email,
     String phone,
     String specialty,
-    String department,
-    String licenseNumber,
-    DoctorAvailability availability,
+    String qualification,
+    String registrationNumber,
+    Integer yearsOfExperience,
     BigDecimal consultationFee,
+    String digitalSignatureUrl,
+    String bio,
+    AccountStatus status,
     Instant createdAt,
     Instant updatedAt) {
 }

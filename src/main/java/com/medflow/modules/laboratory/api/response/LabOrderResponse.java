@@ -3,14 +3,14 @@ package com.medflow.modules.laboratory.api.response;
 import com.medflow.modules.laboratory.api.LabOrderStatus;
 import com.medflow.modules.laboratory.api.LabPriority;
 import java.time.Instant;
-import java.util.UUID;
 
 public record LabOrderResponse(
-    UUID id,
-    UUID patientId,
+    Long id,
+    Long hospitalId,
+    Long patientId,
     String patientName,
-    UUID orderedBy,
-    String orderedByName,
+    Long doctorId,
+    String doctorName,
     String testName,
     LabPriority priority,
     LabOrderStatus status,

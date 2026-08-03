@@ -2,8 +2,10 @@ package com.medflow.modules.auth.application;
 
 import com.medflow.modules.users.api.response.UserAccountResponse;
 import com.medflow.shared.security.SecurityProperties;
+import com.medflow.shared.security.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -11,7 +13,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Component;
 
-/** Issues HS256 access tokens; the subject is the user id, the role claim drives authorization. */
+/**
+ * Issues HS256 access tokens. The subject is the user id; the token also carries the
+ * tenant ({@code hospitalId}), the role that drives {@code hasRole(...)} checks and the
+ * permission codes the UI uses to decide which actions to render.
+ */
 @Component
 class TokenService {
 
@@ -25,17 +31,20 @@ class TokenService {
     this.clock = clock;
   }
 
-  IssuedToken issue(UserAccountResponse user) {
+  IssuedToken issue(UserAccountResponse user, List<String> permissions) {
     var now = Instant.now(clock);
     var expiresAt = now.plus(properties.jwt().accessTokenTtl());
     var claims = JwtClaimsSet.builder()
         .issuer(properties.jwt().issuer())
         .issuedAt(now)
         .expiresAt(expiresAt)
-        .subject(user.id().toString())
-        .claim("email", user.email())
-        .claim("name", user.fullName())
-        .claim("role", user.role().name())
+        .subject(String.valueOf(user.id()))
+        .claim(TenantContext.HOSPITAL_CLAIM, user.hospitalId())
+        .claim(TenantContext.EMAIL_CLAIM, user.email())
+        .claim(TenantContext.NAME_CLAIM, user.fullName())
+        .claim(TenantContext.ROLE_CLAIM, user.roleCode())
+        .claim("permissions", permissions)
+        .claim("userUid", user.userUid())
         .build();
     var header = JwsHeader.with(MacAlgorithm.HS256).build();
     var token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

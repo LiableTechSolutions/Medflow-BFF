@@ -8,34 +8,30 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 /** Public API of the Appointments module. */
 public interface AppointmentService {
 
-  AppointmentResponse book(BookAppointmentRequest request);
+  AppointmentResponse book(Long hospitalId, Long bookedByUserId, BookAppointmentRequest request);
 
-  AppointmentResponse findById(UUID appointmentId);
+  AppointmentResponse findById(Long hospitalId, Long appointmentId);
 
-  PageResponse<AppointmentResponse> search(AppointmentStatus status, UUID doctorId,
-      UUID patientId, LocalDate date, int page, int size);
+  PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
+      Long doctorId, Long patientId, LocalDate date, int page, int size);
 
-  AppointmentResponse confirm(UUID appointmentId);
+  /** Moves the appointment through its workflow; illegal transitions are rejected. */
+  AppointmentResponse transition(Long hospitalId, Long appointmentId, AppointmentStatus target);
 
-  AppointmentResponse complete(UUID appointmentId);
-
-  AppointmentResponse cancel(UUID appointmentId);
-
-  /** Moves the appointment and resets it to PENDING for re-confirmation. */
-  AppointmentResponse reschedule(UUID appointmentId, RescheduleAppointmentRequest request);
+  AppointmentResponse reschedule(Long hospitalId, Long appointmentId,
+      RescheduleAppointmentRequest request);
 
   // --- Aggregates consumed by the analytics module ---
 
-  long countOnDate(LocalDate date);
+  long countOnDate(Long hospitalId, LocalDate date);
 
-  long countActive();
+  long countActive(Long hospitalId);
 
-  BigDecimal completedRevenueBetween(Instant from, Instant to);
+  BigDecimal completedRevenueBetween(Long hospitalId, Instant from, Instant to);
 
-  List<DailyAppointmentCount> dailyCounts(LocalDate from, LocalDate to);
+  List<DailyAppointmentCount> dailyCounts(Long hospitalId, LocalDate from, LocalDate to);
 }

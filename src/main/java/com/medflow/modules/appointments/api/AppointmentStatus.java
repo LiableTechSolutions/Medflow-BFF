@@ -1,6 +1,14 @@
 package com.medflow.modules.appointments.api;
 
-/** Lifecycle: PENDING → CONFIRMED → COMPLETED; PENDING/CONFIRMED may be CANCELLED. */
+/**
+ * Mirrors {@code appointment_status_enum}. The happy path walks the front-desk workflow:
+ * BOOKED → CONFIRMED → CHECKED_IN → IN_CONSULTATION → COMPLETED. Anything before
+ * COMPLETED can end as CANCELLED, and a patient who never arrives ends as NO_SHOW.
+ */
 public enum AppointmentStatus {
-  PENDING, CONFIRMED, COMPLETED, CANCELLED
+  BOOKED, CONFIRMED, CHECKED_IN, IN_CONSULTATION, COMPLETED, CANCELLED, NO_SHOW;
+
+  public boolean isClosed() {
+    return this == COMPLETED || this == CANCELLED || this == NO_SHOW;
+  }
 }

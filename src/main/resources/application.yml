@@ -3,19 +3,39 @@ spring:
     name: medflow-ai
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/medflow}
-    username: ${DB_USERNAME:medflow}
-    password: ${DB_PASSWORD:medflow}
+    # Local credentials belong in ./config/application.yml (git-ignored) or in the
+    # DB_USERNAME / DB_PASSWORD environment variables — never in the repository.
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: medflow-pool
+      maximum-pool-size: ${DB_POOL_SIZE:10}
   jpa:
     open-in-view: false
     hibernate:
+      # Migrations own the schema; Hibernate only validates it and fails fast on drift.
       ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
   flyway:
-    # Scans module-owned folders recursively: db/migration/<module>/V<n>__*.sql
-    locations: classpath:db/migration
+    enabled: true
+    # db/migration holds the schema, scanned recursively as db/migration/<module>/V<n>__*.sql
+    # db/demo holds the sample workspace — drop it for a clean production database:
+    #   FLYWAY_LOCATIONS=classpath:db/migration
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration,classpath:db/demo}
+    baseline-on-migrate: true
+    # Seed data contains BCrypt hashes and JSON; never treat ${...} as a placeholder.
+    placeholder-replacement: false
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
 
 medflow:
   security:
@@ -25,10 +45,18 @@ medflow:
       issuer: medflow-ai
       access-token-ttl: ${JWT_TTL:PT8H}
     cors:
-      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost:3000}
+  cache:
+    # "simple" keeps local development dependency-free (in-memory caches).
+    # Set to "redis" when a Redis instance is available.
+    provider: ${CACHE_PROVIDER:simple}
 
 springdoc:
   api-docs.path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
 
 management:
   endpoints.web.exposure.include: health,info,prometheus
@@ -36,3 +64,5 @@ management:
 
 logging:
   pattern.level: "%5p [traceId=%X{traceId:-}]"
+  level:
+    com.medflow: ${LOG_LEVEL:INFO}

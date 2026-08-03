@@ -8,11 +8,9 @@ import com.medflow.modules.pharmacy.api.request.UpdateMedicationRequest;
 import com.medflow.modules.pharmacy.api.response.MedicationResponse;
 import com.medflow.modules.pharmacy.domain.entity.Medication;
 import com.medflow.modules.pharmacy.domain.repository.MedicationRepository;
-import com.medflow.modules.pharmacy.mapper.MedicationMapper;
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.exception.DuplicateResourceException;
 import com.medflow.shared.exception.ResourceNotFoundException;
-import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -25,70 +23,78 @@ class MedicationServiceImpl implements MedicationService {
   private static final int MAX_PAGE_SIZE = 100;
 
   private final MedicationRepository repository;
-  private final MedicationMapper mapper;
   private final ApplicationEventPublisher eventPublisher;
 
-  MedicationServiceImpl(MedicationRepository repository, MedicationMapper mapper,
+  MedicationServiceImpl(MedicationRepository repository,
       ApplicationEventPublisher eventPublisher) {
     this.repository = repository;
-    this.mapper = mapper;
     this.eventPublisher = eventPublisher;
   }
 
   @Override
   @Transactional
-  public MedicationResponse create(CreateMedicationRequest request) {
-    if (repository.existsByNameIgnoreCase(request.name())) {
+  public MedicationResponse create(Long hospitalId, CreateMedicationRequest request) {
+    if (repository.existsByHospitalIdAndNameIgnoreCase(hospitalId, request.name())) {
       throw new DuplicateResourceException("A medication with this name already exists");
     }
-    var medication = new Medication(request.name(), request.category(), request.unitPrice(),
-        request.stockQuantity(), request.reorderLevel(), request.expiryDate());
-    return mapper.toResponse(repository.save(medication));
+    var medication = repository.save(new Medication(hospitalId, request.name(), request.category(),
+        request.unitPrice(), request.stockQuantity(), request.reorderLevel(),
+        request.expiryDate()));
+    return toResponse(medication);
   }
 
   @Override
   @Transactional(readOnly = true)
-  public MedicationResponse findById(UUID medicationId) {
-    return mapper.toResponse(load(medicationId));
+  public MedicationResponse findById(Long hospitalId, Long medicationId) {
+    return toResponse(load(hospitalId, medicationId));
   }
 
   @Override
   @Transactional
-  public MedicationResponse update(UUID medicationId, UpdateMedicationRequest request) {
-    if (repository.existsByNameIgnoreCaseAndIdNot(request.name(), medicationId)) {
+  public MedicationResponse update(Long hospitalId, Long medicationId,
+      UpdateMedicationRequest request) {
+    if (repository.existsByHospitalIdAndNameIgnoreCaseAndIdNot(hospitalId, request.name(),
+        medicationId)) {
       throw new DuplicateResourceException("A medication with this name already exists");
     }
-    var medication = load(medicationId);
+    var medication = load(hospitalId, medicationId);
     medication.update(request.name(), request.category(), request.unitPrice(),
         request.reorderLevel(), request.expiryDate());
-    return mapper.toResponse(medication);
+    return toResponse(medication);
   }
 
   @Override
   @Transactional(readOnly = true)
-  public PageResponse<MedicationResponse> search(String query, boolean lowStockOnly, int page,
-      int size) {
+  public PageResponse<MedicationResponse> search(Long hospitalId, String query,
+      boolean lowStockOnly, int page, int size) {
     var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
         Sort.by(Sort.Direction.ASC, "name"));
     var normalized = (query == null || query.isBlank()) ? null : query.trim();
     return PageResponse.from(
-        repository.search(normalized, lowStockOnly, pageable).map(mapper::toResponse));
+        repository.search(hospitalId, normalized, lowStockOnly, pageable).map(this::toResponse));
   }
 
   @Override
   @Transactional
-  public MedicationResponse adjustStock(UUID medicationId, AdjustStockRequest request) {
-    var medication = load(medicationId);
-    var crossedThreshold = medication.adjustStock(request.delta());
-    if (crossedThreshold) {
-      eventPublisher.publishEvent(new MedicationLowStockEvent(medication.getId(),
+  public MedicationResponse adjustStock(Long hospitalId, Long medicationId,
+      AdjustStockRequest request) {
+    var medication = load(hospitalId, medicationId);
+    if (medication.adjustStock(request.delta())) {
+      eventPublisher.publishEvent(new MedicationLowStockEvent(hospitalId, medication.getId(),
           medication.getName(), medication.getStockQuantity(), medication.getReorderLevel()));
     }
-    return mapper.toResponse(medication);
+    return toResponse(medication);
   }
 
-  private Medication load(UUID medicationId) {
-    return repository.findById(medicationId)
+  private Medication load(Long hospitalId, Long medicationId) {
+    return repository.findByIdAndHospitalId(medicationId, hospitalId)
         .orElseThrow(() -> new ResourceNotFoundException("Medication not found: " + medicationId));
+  }
+
+  private MedicationResponse toResponse(Medication medication) {
+    return new MedicationResponse(medication.getId(), medication.getHospitalId(),
+        medication.getName(), medication.getCategory(), medication.getUnitPrice(),
+        medication.getStockQuantity(), medication.getReorderLevel(), medication.isLowStock(),
+        medication.getExpiryDate(), medication.getCreatedAt(), medication.getUpdatedAt());
   }
 }

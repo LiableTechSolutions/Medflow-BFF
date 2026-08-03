@@ -3,10 +3,10 @@ package com.medflow.modules.pharmacy.api.response;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.UUID;
 
 public record MedicationResponse(
-    UUID id,
+    Long id,
+    Long hospitalId,
     String name,
     String category,
     BigDecimal unitPrice,

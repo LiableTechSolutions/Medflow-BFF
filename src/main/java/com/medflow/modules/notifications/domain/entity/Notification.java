@@ -6,25 +6,27 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 
 /**
- * Workspace-level notification. Per-recipient targeting and read receipts are a
- * deliberate later step; the current feed is shared by the whole clinic, matching the
- * single feed shown in the UI.
+ * Hospital-level notification. Per-recipient targeting and read receipts are a deliberate
+ * later step; the current feed is shared by the whole clinic, matching the single feed
+ * shown in the UI.
  */
 @Entity
-@Table(name = "notifications", indexes = {
-    @Index(name = "idx_notifications_created", columnList = "created_at"),
-    @Index(name = "idx_notifications_read", columnList = "is_read")})
+@Table(name = "notifications")
 public class Notification {
 
   @Id
-  private UUID id;
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(name = "hospital_id", nullable = false)
+  private Long hospitalId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
@@ -49,9 +51,9 @@ public class Notification {
   protected Notification() {
   }
 
-  public Notification(NotificationCategory category, NotificationSeverity severity, String title,
-      String message) {
-    this.id = UUID.randomUUID();
+  public Notification(Long hospitalId, NotificationCategory category,
+      NotificationSeverity severity, String title, String message) {
+    this.hospitalId = hospitalId;
     this.category = category;
     this.severity = severity;
     this.title = title;
@@ -64,7 +66,8 @@ public class Notification {
     this.read = true;
   }
 
-  public UUID getId() { return id; }
+  public Long getId() { return id; }
+  public Long getHospitalId() { return hospitalId; }
   public NotificationCategory getCategory() { return category; }
   public NotificationSeverity getSeverity() { return severity; }
   public String getTitle() { return title; }

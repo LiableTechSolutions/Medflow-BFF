@@ -7,10 +7,10 @@ import java.util.List;
 /** Public API of the Settings module. */
 public interface SettingsService {
 
-  List<SettingResponse> getAll();
+  List<SettingResponse> getAll(Long hospitalId);
 
-  SettingResponse get(String key);
+  SettingResponse get(Long hospitalId, String key);
 
   /** Creates the key when absent, otherwise overwrites its value. */
-  SettingResponse put(String key, UpdateSettingRequest request);
+  SettingResponse put(Long hospitalId, String key, UpdateSettingRequest request);
 }

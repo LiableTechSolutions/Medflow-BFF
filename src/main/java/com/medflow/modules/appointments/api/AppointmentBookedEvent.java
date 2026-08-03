@@ -1,14 +1,17 @@
 package com.medflow.modules.appointments.api;
 
 import java.time.Instant;
-import java.util.UUID;
 
-/** Published after a booking commits; carries display names so listeners need no lookups. */
+/**
+ * Published after a booking commits. Carries the tenant and display names so listeners
+ * need no lookups and no security context of their own.
+ */
 public record AppointmentBookedEvent(
-    UUID appointmentId,
-    UUID patientId,
+    Long hospitalId,
+    Long appointmentId,
+    Long patientId,
     String patientName,
-    UUID doctorId,
+    Long doctorId,
     String doctorName,
     Instant scheduledAt) {
 }

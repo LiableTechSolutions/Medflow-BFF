@@ -7,28 +7,30 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
-@Table(name = "lab_orders", indexes = {
-    @Index(name = "idx_lab_orders_patient", columnList = "patient_id"),
-    @Index(name = "idx_lab_orders_status", columnList = "status")})
+@Table(name = "lab_orders")
 public class LabOrder {
 
   @Id
-  private UUID id;
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(name = "hospital_id", nullable = false)
+  private Long hospitalId;
 
   @Column(name = "patient_id", nullable = false)
-  private UUID patientId;
+  private Long patientId;
 
-  @Column(name = "ordered_by", nullable = false)
-  private UUID orderedBy;
+  @Column(name = "doctor_id", nullable = false)
+  private Long doctorId;
 
-  @Column(nullable = false, length = 150)
+  @Column(name = "test_name", nullable = false, length = 150)
   private String testName;
 
   @Enumerated(EnumType.STRING)
@@ -39,24 +41,26 @@ public class LabOrder {
   @Column(nullable = false, length = 20)
   private LabOrderStatus status;
 
-  @Column(length = 2000)
+  @Column(name = "result_summary", length = 2000)
   private String resultSummary;
 
-  @Column(nullable = false, updatable = false)
+  @Column(name = "ordered_at", nullable = false, updatable = false)
   private Instant orderedAt;
 
+  @Column(name = "completed_at")
   private Instant completedAt;
 
-  @Column(nullable = false)
+  @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
   protected LabOrder() {
   }
 
-  public LabOrder(UUID patientId, UUID orderedBy, String testName, LabPriority priority) {
-    this.id = UUID.randomUUID();
+  public LabOrder(Long hospitalId, Long patientId, Long doctorId, String testName,
+      LabPriority priority) {
+    this.hospitalId = hospitalId;
     this.patientId = patientId;
-    this.orderedBy = orderedBy;
+    this.doctorId = doctorId;
     this.testName = testName;
     this.priority = priority;
     this.status = LabOrderStatus.ORDERED;
@@ -100,9 +104,10 @@ public class LabOrder {
     this.updatedAt = Instant.now();
   }
 
-  public UUID getId() { return id; }
-  public UUID getPatientId() { return patientId; }
-  public UUID getOrderedBy() { return orderedBy; }
+  public Long getId() { return id; }
+  public Long getHospitalId() { return hospitalId; }
+  public Long getPatientId() { return patientId; }
+  public Long getDoctorId() { return doctorId; }
   public String getTestName() { return testName; }
   public LabPriority getPriority() { return priority; }
   public LabOrderStatus getStatus() { return status; }

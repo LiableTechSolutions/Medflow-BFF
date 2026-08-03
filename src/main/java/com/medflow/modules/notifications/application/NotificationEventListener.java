@@ -13,7 +13,11 @@ import java.time.format.DateTimeFormatter;
 import org.springframework.modulith.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
-/** Turns domain events from other modules into entries in the workspace alert feed. */
+/**
+ * Turns domain events from other modules into entries in the workspace alert feed.
+ * Listeners run after commit, in their own transaction and outside any request, so every
+ * event carries its own tenant rather than reading one from a security context.
+ */
 @Component
 class NotificationEventListener {
 
@@ -28,15 +32,15 @@ class NotificationEventListener {
 
   @ApplicationModuleListener
   void on(AppointmentBookedEvent event) {
-    repository.save(new Notification(NotificationCategory.APPOINTMENT, NotificationSeverity.INFO,
-        "Appointment booked",
+    repository.save(new Notification(event.hospitalId(), NotificationCategory.APPOINTMENT,
+        NotificationSeverity.INFO, "Appointment booked",
         event.patientName() + " is scheduled with " + event.doctorName() + " at "
             + TIME_FORMAT.format(event.scheduledAt()) + "."));
   }
 
   @ApplicationModuleListener
   void on(AppointmentScheduleConflictEvent event) {
-    repository.save(new Notification(NotificationCategory.APPOINTMENT,
+    repository.save(new Notification(event.hospitalId(), NotificationCategory.APPOINTMENT,
         NotificationSeverity.WARNING, "Schedule conflict",
         event.doctorName() + " has overlapping bookings at "
             + TIME_FORMAT.format(event.scheduledAt()) + "."));
@@ -44,16 +48,16 @@ class NotificationEventListener {
 
   @ApplicationModuleListener
   void on(LabOrderCompletedEvent event) {
-    repository.save(new Notification(NotificationCategory.LABORATORY, NotificationSeverity.INFO,
-        "Lab results ready",
+    repository.save(new Notification(event.hospitalId(), NotificationCategory.LABORATORY,
+        NotificationSeverity.INFO, "Lab results ready",
         event.patientName() + "'s " + event.testName() + " results just came in."));
   }
 
   @ApplicationModuleListener
   void on(MedicationLowStockEvent event) {
-    repository.save(new Notification(NotificationCategory.PHARMACY, NotificationSeverity.WARNING,
-        "Low stock alert",
-        "Pharmacy flagged " + event.name() + " running low ("
-            + event.stockQuantity() + " left, reorder at " + event.reorderLevel() + ")."));
+    repository.save(new Notification(event.hospitalId(), NotificationCategory.PHARMACY,
+        NotificationSeverity.WARNING, "Low stock alert",
+        "Pharmacy flagged " + event.name() + " running low (" + event.stockQuantity()
+            + " left, reorder at " + event.reorderLevel() + ")."));
   }
 }

@@ -1,0 +1,13 @@
+# Copy this folder to `config/` (which is git-ignored) and edit the values to match your
+# machine. Spring Boot loads ./config/application.yml automatically on top of the
+# packaged configuration, so `mvn spring-boot:run` picks it up with no extra flags.
+#
+#     Copy-Item -Recurse config.example config
+#
+# Everything here can equally be supplied as environment variables
+# (DB_URL, DB_USERNAME, DB_PASSWORD, …) — see LOCAL_SETUP.md.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/medflow
+    username: postgres
+    password: change-me

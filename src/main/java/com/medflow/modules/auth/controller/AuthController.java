@@ -9,13 +9,11 @@ import com.medflow.modules.auth.api.response.AuthResponse;
 import com.medflow.modules.users.api.response.UserAccountResponse;
 import com.medflow.shared.api.ApiResponse;
 import com.medflow.shared.security.PublicApi;
+import com.medflow.shared.security.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,17 +25,20 @@ import org.springframework.web.bind.annotation.RestController;
 class AuthController {
 
   private final AuthService service;
+  private final TenantContext tenantContext;
 
-  AuthController(AuthService service) {
+  AuthController(AuthService service, TenantContext tenantContext) {
     this.service = service;
+    this.tenantContext = tenantContext;
   }
 
   @PostMapping("/register")
   @PublicApi
-  @Operation(summary = "Create workspace account", description = "Signs up and returns an access token.")
+  @Operation(summary = "Create workspace",
+      description = "Creates a hospital plus its first administrator and returns an access token.")
   ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.success("Account created successfully", service.register(request)));
+        .body(ApiResponse.success("Workspace created successfully", service.register(request)));
   }
 
   @PostMapping("/login")
@@ -67,8 +68,8 @@ class AuthController {
 
   @GetMapping("/me")
   @Operation(summary = "Current user", description = "Returns the profile of the authenticated user.")
-  ApiResponse<UserAccountResponse> me(@AuthenticationPrincipal Jwt jwt) {
+  ApiResponse<UserAccountResponse> me() {
     return ApiResponse.success("Profile retrieved successfully",
-        service.currentUser(UUID.fromString(jwt.getSubject())));
+        service.currentUser(tenantContext.userId()));
   }
 }

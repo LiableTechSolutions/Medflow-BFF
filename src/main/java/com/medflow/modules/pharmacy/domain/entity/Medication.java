@@ -3,21 +3,24 @@ package com.medflow.modules.pharmacy.domain.entity;
 import com.medflow.shared.exception.BusinessRuleViolationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Entity
-@Table(name = "medications",
-    uniqueConstraints = @UniqueConstraint(name = "uk_medications_name", columnNames = "name"))
+@Table(name = "medications")
 public class Medication {
 
   @Id
-  private UUID id;
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(name = "hospital_id", nullable = false)
+  private Long hospitalId;
 
   @Column(nullable = false, length = 150)
   private String name;
@@ -25,29 +28,30 @@ public class Medication {
   @Column(nullable = false, length = 100)
   private String category;
 
-  @Column(nullable = false, precision = 10, scale = 2)
+  @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
   private BigDecimal unitPrice;
 
-  @Column(nullable = false)
+  @Column(name = "stock_quantity", nullable = false)
   private int stockQuantity;
 
-  @Column(nullable = false)
+  @Column(name = "reorder_level", nullable = false)
   private int reorderLevel;
 
+  @Column(name = "expiry_date")
   private LocalDate expiryDate;
 
-  @Column(nullable = false, updatable = false)
+  @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
-  @Column(nullable = false)
+  @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
   protected Medication() {
   }
 
-  public Medication(String name, String category, BigDecimal unitPrice, int stockQuantity,
-      int reorderLevel, LocalDate expiryDate) {
-    this.id = UUID.randomUUID();
+  public Medication(Long hospitalId, String name, String category, BigDecimal unitPrice,
+      int stockQuantity, int reorderLevel, LocalDate expiryDate) {
+    this.hospitalId = hospitalId;
     this.name = name;
     this.category = category;
     this.unitPrice = unitPrice;
@@ -89,7 +93,8 @@ public class Medication {
     this.updatedAt = Instant.now();
   }
 
-  public UUID getId() { return id; }
+  public Long getId() { return id; }
+  public Long getHospitalId() { return hospitalId; }
   public String getName() { return name; }
   public String getCategory() { return category; }
   public BigDecimal getUnitPrice() { return unitPrice; }

@@ -5,11 +5,10 @@ import com.medflow.modules.auth.api.request.RegisterRequest;
 import com.medflow.modules.auth.api.request.ResetPasswordRequest;
 import com.medflow.modules.auth.api.response.AuthResponse;
 import com.medflow.modules.users.api.response.UserAccountResponse;
-import java.util.UUID;
 
 public interface AuthService {
 
-  /** Creates the account and signs the user in immediately (UI navigates straight to the dashboard). */
+  /** Creates the hospital and its first administrator, then signs that user straight in. */
   AuthResponse register(RegisterRequest request);
 
   AuthResponse login(LoginRequest request);
@@ -19,5 +18,5 @@ public interface AuthService {
 
   void resetPassword(ResetPasswordRequest request);
 
-  UserAccountResponse currentUser(UUID userId);
+  UserAccountResponse currentUser(Long userId);
 }

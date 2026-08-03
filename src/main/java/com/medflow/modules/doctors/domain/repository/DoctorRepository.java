@@ -1,30 +1,40 @@
 package com.medflow.modules.doctors.domain.repository;
 
-import com.medflow.modules.doctors.api.DoctorAvailability;
 import com.medflow.modules.doctors.domain.entity.Doctor;
-import java.util.UUID;
+import com.medflow.shared.domain.AccountStatus;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
+public interface DoctorRepository extends JpaRepository<Doctor, Long> {
 
-  boolean existsByEmailIgnoreCase(String email);
+  Optional<Doctor> findByIdAndHospitalId(Long id, Long hospitalId);
 
-  boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
+  List<Doctor> findByHospitalIdAndIdIn(Long hospitalId, Iterable<Long> ids);
 
-  boolean existsByLicenseNumber(String licenseNumber);
+  boolean existsByRegistrationNumber(String registrationNumber);
 
+  long countByHospitalId(Long hospitalId);
+
+  /**
+   * Free-text search over the doctor's own columns. Name matching happens in the users
+   * module, which passes the matching user ids in.
+   */
   @Query("""
       SELECT d FROM Doctor d
-      WHERE (:query IS NULL
-             OR LOWER(d.fullName) LIKE LOWER(CONCAT('%', :query, '%'))
-             OR LOWER(d.email) LIKE LOWER(CONCAT('%', :query, '%')))
-        AND (:specialty IS NULL OR LOWER(d.specialty) = LOWER(:specialty))
-        AND (:availability IS NULL OR d.availability = :availability)
+      WHERE d.hospitalId = :hospitalId
+        AND (CAST(:specialty AS string) IS NULL OR LOWER(d.specialty) = LOWER(CAST(:specialty AS string)))
+        AND (:status IS NULL OR d.status = :status)
+        AND (CAST(:query AS string) IS NULL
+             OR LOWER(d.specialty) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%'))
+             OR LOWER(d.doctorCode) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%'))
+             OR d.userId IN :matchingUserIds)
       """)
-  Page<Doctor> search(@Param("query") String query, @Param("specialty") String specialty,
-      @Param("availability") DoctorAvailability availability, Pageable pageable);
+  Page<Doctor> search(@Param("hospitalId") Long hospitalId, @Param("query") String query,
+      @Param("specialty") String specialty, @Param("status") AccountStatus status,
+      @Param("matchingUserIds") List<Long> matchingUserIds, Pageable pageable);
 }

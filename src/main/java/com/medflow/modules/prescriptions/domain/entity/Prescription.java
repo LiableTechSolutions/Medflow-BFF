@@ -2,70 +2,72 @@ package com.medflow.modules.prescriptions.domain.entity;
 
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import com.medflow.shared.exception.BusinessRuleViolationException;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 @Entity
-@Table(name = "prescriptions", indexes = {
-    @Index(name = "idx_prescriptions_patient", columnList = "patient_id"),
-    @Index(name = "idx_prescriptions_doctor", columnList = "doctor_id")})
+@Table(name = "prescriptions")
 public class Prescription {
 
   @Id
-  private UUID id;
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-  @Column(name = "patient_id", nullable = false)
-  private UUID patientId;
+  @Column(name = "hospital_id", nullable = false)
+  private Long hospitalId;
+
+  @Column(name = "appointment_id")
+  private Long appointmentId;
 
   @Column(name = "doctor_id", nullable = false)
-  private UUID doctorId;
+  private Long doctorId;
 
-  @Enumerated(EnumType.STRING)
+  @Column(name = "patient_id", nullable = false)
+  private Long patientId;
+
+  @Column(length = 2000)
+  private String diagnosis;
+
+  /** Serialized medication lines; see {@code PrescriptionItemResponse} for the shape. */
+  @Column(name = "medicines_json", nullable = false, length = 8000)
+  private String medicinesJson;
+
+  @Column(name = "digitally_signed", nullable = false)
+  private boolean digitallySigned;
+
+  @Column(name = "signed_at")
+  private Instant signedAt;
+
   @Column(nullable = false, length = 20)
   private PrescriptionStatus status;
 
-  @Column(length = 1000)
-  private String notes;
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private Instant createdAt;
 
-  @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, orphanRemoval = true)
-  @OrderBy("medicationName ASC")
-  private List<PrescriptionItem> items = new ArrayList<>();
-
-  @Column(nullable = false, updatable = false)
-  private Instant issuedAt;
-
-  @Column(nullable = false)
+  @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
   protected Prescription() {
   }
 
-  public Prescription(UUID patientId, UUID doctorId, String notes) {
-    this.id = UUID.randomUUID();
-    this.patientId = patientId;
+  public Prescription(Long hospitalId, Long appointmentId, Long doctorId, Long patientId,
+      String diagnosis, String medicinesJson, boolean digitallySigned) {
+    this.hospitalId = hospitalId;
+    this.appointmentId = appointmentId;
     this.doctorId = doctorId;
-    this.notes = notes;
+    this.patientId = patientId;
+    this.diagnosis = diagnosis;
+    this.medicinesJson = medicinesJson;
+    this.digitallySigned = digitallySigned;
     this.status = PrescriptionStatus.ACTIVE;
-    this.issuedAt = Instant.now();
-    this.updatedAt = this.issuedAt;
-  }
-
-  public void addItem(String medicationName, String dosage, String frequency,
-      Integer durationDays, String instructions) {
-    items.add(new PrescriptionItem(this, medicationName, dosage, frequency, durationDays,
-        instructions));
+    this.createdAt = Instant.now();
+    this.updatedAt = this.createdAt;
+    this.signedAt = digitallySigned ? this.createdAt : null;
   }
 
   public void complete() {
@@ -90,12 +92,16 @@ public class Prescription {
     this.updatedAt = Instant.now();
   }
 
-  public UUID getId() { return id; }
-  public UUID getPatientId() { return patientId; }
-  public UUID getDoctorId() { return doctorId; }
+  public Long getId() { return id; }
+  public Long getHospitalId() { return hospitalId; }
+  public Long getAppointmentId() { return appointmentId; }
+  public Long getDoctorId() { return doctorId; }
+  public Long getPatientId() { return patientId; }
+  public String getDiagnosis() { return diagnosis; }
+  public String getMedicinesJson() { return medicinesJson; }
+  public boolean isDigitallySigned() { return digitallySigned; }
+  public Instant getSignedAt() { return signedAt; }
   public PrescriptionStatus getStatus() { return status; }
-  public String getNotes() { return notes; }
-  public List<PrescriptionItem> getItems() { return List.copyOf(items); }
-  public Instant getIssuedAt() { return issuedAt; }
+  public Instant getCreatedAt() { return createdAt; }
   public Instant getUpdatedAt() { return updatedAt; }
 }
