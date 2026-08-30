@@ -3,6 +3,7 @@ package com.medflow.modules.patients.application;
 import com.medflow.modules.patients.api.MappingRelation;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.PatientSummary;
+import com.medflow.modules.patients.api.RegistrationFieldState;
 import com.medflow.modules.patients.api.request.AddMedicalHistoryRequest;
 import com.medflow.modules.patients.api.request.AddPatientReportRequest;
 import com.medflow.modules.patients.api.request.CreatePatientRequest;
@@ -44,21 +45,24 @@ class PatientServiceImpl implements PatientService {
   private final PatientReportRepository reportRepository;
   private final UserPatientMappingRepository mappingRepository;
   private final UserAccountService userAccountService;
+  private final RegistrationProfileService registrationProfileService;
 
   PatientServiceImpl(PatientRepository repository,
       PatientMedicalHistoryRepository historyRepository,
       PatientReportRepository reportRepository, UserPatientMappingRepository mappingRepository,
-      UserAccountService userAccountService) {
+      UserAccountService userAccountService, RegistrationProfileService registrationProfileService) {
     this.repository = repository;
     this.historyRepository = historyRepository;
     this.reportRepository = reportRepository;
     this.mappingRepository = mappingRepository;
     this.userAccountService = userAccountService;
+    this.registrationProfileService = registrationProfileService;
   }
 
   @Override
   @Transactional
   public PatientResponse create(Long hospitalId, CreatePatientRequest request) {
+    registrationProfileService.validatePatientFields(hospitalId, createFieldMap(request));
     if (request.email() != null
         && repository.existsByHospitalIdAndEmailIgnoreCase(hospitalId, request.email())) {
       throw new DuplicateResourceException("A patient with this email already exists");
@@ -79,6 +83,7 @@ class PatientServiceImpl implements PatientService {
   @Override
   @Transactional
   public PatientResponse update(Long hospitalId, Long patientId, UpdatePatientRequest request) {
+    registrationProfileService.validatePatientFields(hospitalId, createFieldMap(request));
     if (request.email() != null && repository.existsByHospitalIdAndEmailIgnoreCaseAndIdNot(
         hospitalId, request.email(), patientId)) {
       throw new DuplicateResourceException("A patient with this email already exists");
@@ -201,6 +206,36 @@ class PatientServiceImpl implements PatientService {
   private Patient load(Long hospitalId, Long patientId) {
     return repository.findByIdAndHospitalIdAndDeletedFalse(patientId, hospitalId)
         .orElseThrow(() -> new ResourceNotFoundException("Patient not found: " + patientId));
+  }
+
+  private java.util.Map<String, String> createFieldMap(CreatePatientRequest request) {
+    var values = new java.util.LinkedHashMap<String, String>();
+    values.put("firstName", request.firstName());
+    values.put("lastName", request.lastName());
+    values.put("gender", request.gender() == null ? null : request.gender().name());
+    values.put("dateOfBirth", request.dateOfBirth() == null ? null : request.dateOfBirth().toString());
+    values.put("bloodGroup", request.bloodGroup());
+    values.put("phone", request.phone());
+    values.put("email", request.email());
+    values.put("address", request.address());
+    values.put("emergencyContactName", request.emergencyContactName());
+    values.put("emergencyContactPhone", request.emergencyContactPhone());
+    return values;
+  }
+
+  private java.util.Map<String, String> createFieldMap(UpdatePatientRequest request) {
+    var values = new java.util.LinkedHashMap<String, String>();
+    values.put("firstName", request.firstName());
+    values.put("lastName", request.lastName());
+    values.put("gender", request.gender() == null ? null : request.gender().name());
+    values.put("dateOfBirth", request.dateOfBirth() == null ? null : request.dateOfBirth().toString());
+    values.put("bloodGroup", request.bloodGroup());
+    values.put("phone", request.phone());
+    values.put("email", request.email());
+    values.put("address", request.address());
+    values.put("emergencyContactName", request.emergencyContactName());
+    values.put("emergencyContactPhone", request.emergencyContactPhone());
+    return values;
   }
 
   private PatientResponse toResponse(Patient patient) {

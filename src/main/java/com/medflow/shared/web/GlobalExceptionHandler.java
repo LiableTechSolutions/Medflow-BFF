@@ -5,6 +5,7 @@ import com.medflow.shared.api.ApiResponse;
 import com.medflow.shared.exception.BusinessRuleViolationException;
 import com.medflow.shared.exception.DuplicateResourceException;
 import com.medflow.shared.exception.InvalidCredentialsException;
+import com.medflow.shared.exception.ProfileValidationException;
 import com.medflow.shared.exception.ResourceNotFoundException;
 import java.util.List;
 import org.slf4j.Logger;
@@ -56,6 +57,11 @@ class GlobalExceptionHandler {
   @ExceptionHandler(BusinessRuleViolationException.class)
   ResponseEntity<ApiResponse<Void>> businessRule(BusinessRuleViolationException exception) {
     return response(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), List.of());
+  }
+
+  @ExceptionHandler(ProfileValidationException.class)
+  ResponseEntity<ApiResponse<Void>> profileValidation(ProfileValidationException exception) {
+    return response(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), exception.getErrors());
   }
 
   @ExceptionHandler(InvalidCredentialsException.class)
