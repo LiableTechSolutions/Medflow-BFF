@@ -12,6 +12,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.Map;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "patients")
@@ -73,6 +76,10 @@ public class Patient {
   @Column(name = "is_deleted", nullable = false)
   private boolean deleted;
 
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "registration_data", nullable = false, columnDefinition = "jsonb")
+  private Map<String, Object> registrationData;
+
   protected Patient() {
   }
 
@@ -91,6 +98,7 @@ public class Patient {
     this.address = address;
     this.emergencyContactName = emergencyContactName;
     this.emergencyContactPhone = emergencyContactPhone;
+    this.registrationData = Map.of();
     this.status = AccountStatus.ACTIVE;
     this.createdAt = Instant.now();
     this.updatedAt = this.createdAt;
@@ -109,6 +117,12 @@ public class Patient {
     this.emergencyContactName = request.emergencyContactName();
     this.emergencyContactPhone = request.emergencyContactPhone();
     this.status = request.status();
+    this.registrationData = request.registrationData() == null ? Map.of() : request.registrationData();
+    this.updatedAt = Instant.now();
+  }
+
+  public void setRegistrationData(Map<String, Object> registrationData) {
+    this.registrationData = registrationData == null ? Map.of() : registrationData;
     this.updatedAt = Instant.now();
   }
 
@@ -143,4 +157,5 @@ public class Patient {
   public Instant getCreatedAt() { return createdAt; }
   public Instant getUpdatedAt() { return updatedAt; }
   public boolean isDeleted() { return deleted; }
+  public Map<String, Object> getRegistrationData() { return registrationData; }
 }

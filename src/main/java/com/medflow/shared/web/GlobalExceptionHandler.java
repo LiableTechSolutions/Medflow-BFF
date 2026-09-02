@@ -55,7 +55,7 @@ class GlobalExceptionHandler {
 
   @ExceptionHandler(BusinessRuleViolationException.class)
   ResponseEntity<ApiResponse<Void>> businessRule(BusinessRuleViolationException exception) {
-    return response(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), List.of());
+    return response(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), exception.errors());
   }
 
   @ExceptionHandler(InvalidCredentialsException.class)

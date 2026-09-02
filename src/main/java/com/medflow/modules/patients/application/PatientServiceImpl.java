@@ -20,14 +20,20 @@ import com.medflow.modules.patients.domain.repository.PatientMedicalHistoryRepos
 import com.medflow.modules.patients.domain.repository.PatientReportRepository;
 import com.medflow.modules.patients.domain.repository.PatientRepository;
 import com.medflow.modules.patients.domain.repository.UserPatientMappingRepository;
+import com.medflow.modules.settings.api.RegistrationFieldState;
+import com.medflow.modules.settings.api.RegistrationProfileService;
 import com.medflow.modules.users.api.UserAccountService;
 import com.medflow.modules.users.api.UserSummary;
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.domain.AccountStatus;
 import com.medflow.shared.exception.DuplicateResourceException;
+import com.medflow.shared.exception.BusinessRuleViolationException;
 import com.medflow.shared.exception.ResourceNotFoundException;
 import java.util.Collection;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.time.LocalDate;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -44,21 +50,26 @@ class PatientServiceImpl implements PatientService {
   private final PatientReportRepository reportRepository;
   private final UserPatientMappingRepository mappingRepository;
   private final UserAccountService userAccountService;
+  private final RegistrationProfileService registrationProfileService;
 
   PatientServiceImpl(PatientRepository repository,
       PatientMedicalHistoryRepository historyRepository,
       PatientReportRepository reportRepository, UserPatientMappingRepository mappingRepository,
-      UserAccountService userAccountService) {
+      UserAccountService userAccountService, RegistrationProfileService registrationProfileService) {
     this.repository = repository;
     this.historyRepository = historyRepository;
     this.reportRepository = reportRepository;
     this.mappingRepository = mappingRepository;
     this.userAccountService = userAccountService;
+    this.registrationProfileService = registrationProfileService;
   }
 
   @Override
   @Transactional
   public PatientResponse create(Long hospitalId, CreatePatientRequest request) {
+    var states = registrationProfileService.statesFor(hospitalId);
+    var registrationData = validateAndFilter(states, request.registrationData(), request.firstName(),
+      request.lastName(), request.dateOfBirth(), request.phone(), request.email());
     if (request.email() != null
         && repository.existsByHospitalIdAndEmailIgnoreCase(hospitalId, request.email())) {
       throw new DuplicateResourceException("A patient with this email already exists");
@@ -67,6 +78,7 @@ class PatientServiceImpl implements PatientService {
         request.firstName(), request.lastName(), request.gender(), request.dateOfBirth(),
         request.bloodGroup(), request.phone(), request.email(), request.address(),
         request.emergencyContactName(), request.emergencyContactPhone()));
+      patient.setRegistrationData(registrationData);
     return toResponse(patient);
   }
 
@@ -79,12 +91,16 @@ class PatientServiceImpl implements PatientService {
   @Override
   @Transactional
   public PatientResponse update(Long hospitalId, Long patientId, UpdatePatientRequest request) {
+    var states = registrationProfileService.statesFor(hospitalId);
+    var registrationData = validateAndFilter(states, request.registrationData(), request.firstName(),
+      request.lastName(), request.dateOfBirth(), request.phone(), request.email());
     if (request.email() != null && repository.existsByHospitalIdAndEmailIgnoreCaseAndIdNot(
         hospitalId, request.email(), patientId)) {
       throw new DuplicateResourceException("A patient with this email already exists");
     }
     var patient = load(hospitalId, patientId);
     patient.update(request);
+    patient.setRegistrationData(registrationData);
     return toResponse(patient);
   }
 
@@ -209,7 +225,36 @@ class PatientServiceImpl implements PatientService {
         patient.getFullName(), patient.getGender(), patient.getDateOfBirth(), patient.getAge(),
         patient.getBloodGroup(), patient.getPhone(), patient.getEmail(), patient.getAddress(),
         patient.getEmergencyContactName(), patient.getEmergencyContactPhone(), patient.getStatus(),
-        patient.getCreatedAt(), patient.getUpdatedAt());
+        patient.getCreatedAt(), patient.getUpdatedAt(), patient.getRegistrationData());
+  }
+
+  private Map<String, Object> validateAndFilter(Map<String, RegistrationFieldState> states,
+      Map<String, Object> submitted, String firstName, String lastName, LocalDate dateOfBirth,
+      String phone, String email) {
+    var values = new LinkedHashMap<String, Object>();
+    if (submitted != null) {
+      values.putAll(submitted);
+    }
+    values.putIfAbsent("first_name", firstName);
+    values.putIfAbsent("last_name", lastName);
+    values.putIfAbsent("date_of_birth", dateOfBirth);
+    values.putIfAbsent("contact_number", phone);
+    values.putIfAbsent("email", email);
+    for (var entry : states.entrySet()) {
+      if (entry.getValue() == RegistrationFieldState.REQUIRED
+          && isBlank(values.get(entry.getKey()))) {
+        throw new BusinessRuleViolationException("Required patient registration field is missing: "
+            + entry.getKey());
+      }
+      if (entry.getValue() == RegistrationFieldState.HIDDEN) {
+        values.remove(entry.getKey());
+      }
+    }
+    return values;
+  }
+
+  private boolean isBlank(Object value) {
+    return value == null || (value instanceof String text && text.isBlank());
   }
 
   private MedicalHistoryResponse toResponse(PatientMedicalHistory entry) {

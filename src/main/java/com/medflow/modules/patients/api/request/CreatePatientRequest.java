@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.Map;
 
 public record CreatePatientRequest(
     @NotBlank @Size(max = 100) String firstName,
@@ -19,5 +20,6 @@ public record CreatePatientRequest(
     @Email @Size(max = 120) String email,
     @Size(max = 1000) String address,
     @Size(max = 100) String emergencyContactName,
-    @Size(max = 20) String emergencyContactPhone) {
+    @Size(max = 20) String emergencyContactPhone,
+    Map<String, Object> registrationData) {
 }

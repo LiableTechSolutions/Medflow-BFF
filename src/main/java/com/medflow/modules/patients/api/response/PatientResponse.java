@@ -4,6 +4,7 @@ import com.medflow.shared.domain.AccountStatus;
 import com.medflow.shared.domain.Gender;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 
 public record PatientResponse(
     Long id,
@@ -24,5 +25,6 @@ public record PatientResponse(
     String emergencyContactPhone,
     AccountStatus status,
     Instant createdAt,
-    Instant updatedAt) {
+    Instant updatedAt,
+    Map<String, Object> registrationData) {
 }
