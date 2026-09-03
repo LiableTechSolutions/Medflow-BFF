@@ -5,8 +5,8 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/medflow}
     # Local credentials belong in ./config/application.yml (git-ignored) or in the
     # DB_USERNAME / DB_PASSWORD environment variables — never in the repository.
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    username: postgres
+    password: 1234
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: medflow-pool
