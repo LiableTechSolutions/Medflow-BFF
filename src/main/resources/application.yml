@@ -25,6 +25,9 @@ spring:
     #   FLYWAY_LOCATIONS=classpath:db/migration
     locations: ${FLYWAY_LOCATIONS:classpath:db/migration,classpath:db/demo}
     baseline-on-migrate: true
+    # Older local databases may contain the retired V101/V102 profile migrations.
+    # Their schema is upgraded by V103 below, so missing script validation is safe here.
+    ignore-migration-patterns: ${FLYWAY_IGNORE_MIGRATION_PATTERNS:*:missing}
     # Seed data contains BCrypt hashes and JSON; never treat ${...} as a placeholder.
     placeholder-replacement: false
   data:
