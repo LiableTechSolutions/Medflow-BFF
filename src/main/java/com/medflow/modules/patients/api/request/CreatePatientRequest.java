@@ -1,6 +1,7 @@
 package com.medflow.modules.patients.api.request;
 
 import com.medflow.shared.domain.Gender;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;
@@ -35,5 +36,9 @@ public record CreatePatientRequest(
     @Size(max = 150) String referringPhysician,
     @Size(max = 100) String guardianName,
     @Size(max = 50) String guardianRelationship,
-    @Size(max = 20) String guardianMobile) {
+    @Size(max = 20) String guardianMobile,
+    /** When true, {@code hospitalisation} must be supplied and an admission record is
+     * created in the same call so the patient starts out as inpatient rather than OPD. */
+    Boolean isHospitalised,
+    @Valid AdmitPatientRequest hospitalisation) {
 }

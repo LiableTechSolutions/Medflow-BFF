@@ -2,11 +2,17 @@ package com.medflow.modules.patients.api;
 
 import com.medflow.modules.patients.api.request.AddMedicalHistoryRequest;
 import com.medflow.modules.patients.api.request.AddPatientReportRequest;
+import com.medflow.modules.patients.api.request.AdmitPatientRequest;
+import com.medflow.modules.patients.api.request.CreateDailyAnalysisRequest;
 import com.medflow.modules.patients.api.request.CreatePatientRequest;
+import com.medflow.modules.patients.api.request.DischargePatientRequest;
 import com.medflow.modules.patients.api.request.LinkPatientAccountRequest;
 import com.medflow.modules.patients.api.request.UpdatePatientRequest;
+import com.medflow.modules.patients.api.response.DailyAnalysisResponse;
+import com.medflow.modules.patients.api.response.HospitalisationRecordResponse;
 import com.medflow.modules.patients.api.response.MedicalHistoryResponse;
 import com.medflow.modules.patients.api.response.PatientAccountResponse;
+import com.medflow.modules.patients.api.response.PatientClinicalSummaryResponse;
 import com.medflow.modules.patients.api.response.PatientReportResponse;
 import com.medflow.modules.patients.api.response.PatientResponse;
 import com.medflow.shared.api.PageResponse;
@@ -46,4 +52,22 @@ public interface PatientService {
   List<PatientSummary> summariesByIds(Long hospitalId, Collection<Long> patientIds);
 
   long countByHospital(Long hospitalId);
+
+  /** Admits a patient: creates the hospitalisation record and flips {@code isHospitalised}. */
+  HospitalisationRecordResponse admitPatient(Long hospitalId, Long patientId,
+      AdmitPatientRequest request);
+
+  /** Discharges the patient's active stay; the record is kept, not deleted. */
+  HospitalisationRecordResponse dischargePatient(Long hospitalId, Long patientId,
+      DischargePatientRequest request);
+
+  /** Doctor-only: records a vitals/notes entry against the active hospitalisation record. */
+  DailyAnalysisResponse addDailyAnalysis(Long hospitalId, Long patientId,
+      CreateDailyAnalysisRequest request);
+
+  /** All daily analyses for the patient across their hospitalisation history, oldest first. */
+  List<DailyAnalysisResponse> dailyAnalyses(Long hospitalId, Long patientId);
+
+  /** Core profile plus the current/most recent hospitalisation stay and its daily analyses. */
+  PatientClinicalSummaryResponse summary(Long hospitalId, Long patientId);
 }

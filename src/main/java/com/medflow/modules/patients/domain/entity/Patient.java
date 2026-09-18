@@ -89,6 +89,9 @@ public class Patient {
   @Column(name = "is_deleted", nullable = false)
   private boolean deleted;
 
+  @Column(name = "is_hospitalised", nullable = false)
+  private boolean hospitalised;
+
   protected Patient() {
   }
 
@@ -131,6 +134,7 @@ public class Patient {
     this.createdAt = Instant.now();
     this.updatedAt = this.createdAt;
     this.deleted = false;
+    this.hospitalised = false;
   }
 
   public void update(UpdatePatientRequest request) {
@@ -165,6 +169,19 @@ public class Patient {
 
   public void linkAccount(Long userId) {
     this.userId = userId;
+    this.updatedAt = Instant.now();
+  }
+
+  /** Flips the OPD/inpatient flag on admission; the {@code HospitalisationRecord} itself
+   * holds the admission details. */
+  public void admit() {
+    this.hospitalised = true;
+    this.updatedAt = Instant.now();
+  }
+
+  /** Flips back to OPD on discharge. The hospitalisation record is kept, not deleted. */
+  public void dischargeFromHospital() {
+    this.hospitalised = false;
     this.updatedAt = Instant.now();
   }
 
@@ -209,4 +226,5 @@ public class Patient {
   public Instant getCreatedAt() { return createdAt; }
   public Instant getUpdatedAt() { return updatedAt; }
   public boolean isDeleted() { return deleted; }
+  public boolean isHospitalised() { return hospitalised; }
 }

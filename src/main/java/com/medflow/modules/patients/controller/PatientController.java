@@ -4,11 +4,17 @@ import com.medflow.modules.audit.api.AuditService;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.request.AddMedicalHistoryRequest;
 import com.medflow.modules.patients.api.request.AddPatientReportRequest;
+import com.medflow.modules.patients.api.request.AdmitPatientRequest;
+import com.medflow.modules.patients.api.request.CreateDailyAnalysisRequest;
 import com.medflow.modules.patients.api.request.CreatePatientRequest;
+import com.medflow.modules.patients.api.request.DischargePatientRequest;
 import com.medflow.modules.patients.api.request.LinkPatientAccountRequest;
 import com.medflow.modules.patients.api.request.UpdatePatientRequest;
+import com.medflow.modules.patients.api.response.DailyAnalysisResponse;
+import com.medflow.modules.patients.api.response.HospitalisationRecordResponse;
 import com.medflow.modules.patients.api.response.MedicalHistoryResponse;
 import com.medflow.modules.patients.api.response.PatientAccountResponse;
+import com.medflow.modules.patients.api.response.PatientClinicalSummaryResponse;
 import com.medflow.modules.patients.api.response.PatientReportResponse;
 import com.medflow.modules.patients.api.response.PatientResponse;
 import com.medflow.shared.api.ApiResponse;
@@ -20,7 +26,9 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -139,5 +147,56 @@ class PatientController {
         "{\"reportType\":\"%s\"}".formatted(created.reportType()));
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success("Report attached successfully", created));
+  }
+
+  @GetMapping("/{patientId}/summary")
+  @Operation(summary = "Get patient summary",
+      description = "Core profile plus the current hospitalisation stay (if any) and its "
+          + "daily analyses, so the frontend can render the OPD or inpatient view from one call.")
+  ApiResponse<PatientClinicalSummaryResponse> summary(@PathVariable Long patientId) {
+    return ApiResponse.success("Patient summary retrieved successfully",
+        service.summary(tenantContext.hospitalId(), patientId));
+  }
+
+  @PostMapping("/{patientId}/hospitalisation")
+  @Operation(summary = "Admit patient",
+      description = "Creates a hospitalisation record for the patient and marks them inpatient.")
+  ResponseEntity<ApiResponse<HospitalisationRecordResponse>> admit(@PathVariable Long patientId,
+      @Valid @RequestBody AdmitPatientRequest request) {
+    var created = service.admitPatient(tenantContext.hospitalId(), patientId, request);
+    auditService.record("PATIENT_ADMITTED", "patient", patientId,
+        "{\"ward\":\"%s\"}".formatted(created.ward()));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success("Patient admitted successfully", created));
+  }
+
+  @PatchMapping("/{patientId}/hospitalisation/discharge")
+  @Operation(summary = "Discharge patient",
+      description = "Closes the patient's active hospitalisation record; history is kept, not deleted.")
+  ApiResponse<HospitalisationRecordResponse> discharge(@PathVariable Long patientId,
+      @Valid @RequestBody DischargePatientRequest request) {
+    var updated = service.dischargePatient(tenantContext.hospitalId(), patientId, request);
+    auditService.record("PATIENT_DISCHARGED", "patient", patientId, null);
+    return ApiResponse.success("Patient discharged successfully", updated);
+  }
+
+  @GetMapping("/{patientId}/hospitalisation/daily-analyses")
+  @Operation(summary = "List daily analyses",
+      description = "Vitals/notes trend recorded during hospitalisation, oldest first.")
+  ApiResponse<List<DailyAnalysisResponse>> dailyAnalyses(@PathVariable Long patientId) {
+    return ApiResponse.success("Daily analyses retrieved successfully",
+        service.dailyAnalyses(tenantContext.hospitalId(), patientId));
+  }
+
+  @PostMapping("/{patientId}/hospitalisation/daily-analyses")
+  @PreAuthorize("hasRole('DOCTOR')")
+  @Operation(summary = "Record daily analysis",
+      description = "Doctor-only: adds a vitals/notes entry against the active hospitalisation record.")
+  ResponseEntity<ApiResponse<DailyAnalysisResponse>> addDailyAnalysis(@PathVariable Long patientId,
+      @Valid @RequestBody CreateDailyAnalysisRequest request) {
+    var created = service.addDailyAnalysis(tenantContext.hospitalId(), patientId, request);
+    auditService.record("PATIENT_DAILY_ANALYSIS_ADDED", "patient", patientId, null);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success("Daily analysis recorded successfully", created));
   }
 }
