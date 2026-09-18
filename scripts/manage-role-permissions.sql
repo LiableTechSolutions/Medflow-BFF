@@ -3,7 +3,7 @@
 --
 -- This is a plain SQL script you run by hand with psql — it is NOT a Flyway migration
 -- and must never be dropped into src/main/resources/db/migration. It only touches
--- role_permissions rows that V15__enable_billing_inpatient_modules.sql already seeded
+-- role_permissions rows that V106__enable_billing_inpatient_modules.sql already seeded
 -- (globally, for every role, hospital_id IS NULL); it never removes a permission or
 -- module from the catalogue.
 --
