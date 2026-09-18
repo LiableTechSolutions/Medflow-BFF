@@ -148,6 +148,7 @@ class MedflowSmokeTest {
         .isEqualTo("Meera Joshi");
     assertThat(JsonPath.<String>read(response.getBody(), "$.data.status")).isEqualTo("BOOKED");
     assertThat(JsonPath.<Integer>read(response.getBody(), "$.data.queueNumber")).isEqualTo(1);
+    Integer appointmentId = JsonPath.read(response.getBody(), "$.data.id");
 
     await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
       var unread = rest.exchange("/api/v1/notifications/unread-count", HttpMethod.GET,
@@ -155,6 +156,18 @@ class MedflowSmokeTest {
       assertThat(unread.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(JsonPath.<Integer>read(unread.getBody(), "$.data.unread")).isGreaterThan(0);
     });
+
+    var notifications = rest.exchange("/api/v1/notifications", HttpMethod.GET, authorized(null),
+        String.class);
+    assertThat(JsonPath.<String>read(notifications.getBody(), "$.data.content[0].message"))
+        .contains("/appointments/" + appointmentId + "/queue");
+
+    var queueStatus = rest.exchange("/api/v1/appointments/" + appointmentId + "/queue-status",
+        HttpMethod.GET, authorized(null), String.class);
+    assertThat(queueStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(JsonPath.<Integer>read(queueStatus.getBody(), "$.data.position")).isEqualTo(1);
+    assertThat(JsonPath.<Integer>read(queueStatus.getBody(), "$.data.aheadCount")).isZero();
+    assertThat(JsonPath.<Integer>read(queueStatus.getBody(), "$.data.totalActive")).isEqualTo(1);
   }
 
   @Test

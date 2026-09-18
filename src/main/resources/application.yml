@@ -53,6 +53,9 @@ medflow:
     # "simple" keeps local development dependency-free (in-memory caches).
     # Set to "redis" when a Redis instance is available.
     provider: ${CACHE_PROVIDER:simple}
+  notifications:
+    # Used to build the live-queue link included in appointment notifications.
+    frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
 
 springdoc:
   api-docs.path: /api-docs

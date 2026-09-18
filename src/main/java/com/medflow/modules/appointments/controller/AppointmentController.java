@@ -5,6 +5,7 @@ import com.medflow.modules.appointments.api.AppointmentStatus;
 import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
+import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.shared.api.ApiResponse;
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.security.TenantContext;
@@ -65,6 +66,14 @@ class AppointmentController {
   ApiResponse<AppointmentResponse> find(@PathVariable Long appointmentId) {
     return ApiResponse.success("Appointment retrieved successfully",
         service.findById(tenantContext.hospitalId(), appointmentId));
+  }
+
+  @GetMapping("/{appointmentId}/queue-status")
+  @Operation(summary = "Get live queue status",
+      description = "This appointment's position among the doctor's still-active appointments today.")
+  ApiResponse<QueueStatusResponse> queueStatus(@PathVariable Long appointmentId) {
+    return ApiResponse.success("Queue status retrieved successfully",
+        service.queueStatus(tenantContext.hospitalId(), appointmentId));
   }
 
   @PatchMapping("/{appointmentId}/confirm")

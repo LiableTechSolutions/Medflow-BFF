@@ -3,6 +3,7 @@ package com.medflow.modules.appointments.api;
 import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
+import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.shared.api.PageResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,6 +16,9 @@ public interface AppointmentService {
   AppointmentResponse book(Long hospitalId, Long bookedByUserId, BookAppointmentRequest request);
 
   AppointmentResponse findById(Long hospitalId, Long appointmentId);
+
+  /** Where this appointment stands in its doctor's live queue for the day. */
+  QueueStatusResponse queueStatus(Long hospitalId, Long appointmentId);
 
   PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
       Long doctorId, Long patientId, LocalDate date, int page, int size);

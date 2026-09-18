@@ -9,6 +9,7 @@ import com.medflow.modules.appointments.api.DailyAppointmentCount;
 import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
+import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.modules.appointments.domain.entity.Appointment;
 import com.medflow.modules.appointments.domain.repository.AppointmentRepository;
 import com.medflow.modules.appointments.domain.repository.AppointmentSpecifications;
@@ -38,6 +39,9 @@ class AppointmentServiceImpl implements AppointmentService {
 
   private static final int DEFAULT_DURATION_MINUTES = 30;
   private static final int MAX_PAGE_SIZE = 100;
+  private static final EnumSet<AppointmentStatus> ACTIVE_QUEUE_STATUSES = EnumSet.of(
+      AppointmentStatus.BOOKED, AppointmentStatus.CONFIRMED, AppointmentStatus.CHECKED_IN,
+      AppointmentStatus.IN_CONSULTATION);
 
   private final AppointmentRepository repository;
   private final PatientService patientService;
@@ -73,7 +77,7 @@ class AppointmentServiceImpl implements AppointmentService {
           doctor.fullName(), appointment.getScheduledAt()));
     }
     eventPublisher.publishEvent(new AppointmentBookedEvent(hospitalId, appointment.getId(),
-        patient.id(), patient.fullName(), doctor.id(), doctor.fullName(),
+        patient.id(), patient.fullName(), patient.phone(), doctor.id(), doctor.fullName(),
         appointment.getScheduledAt()));
 
     return toResponse(appointment, patient.fullName(), doctor);
@@ -83,6 +87,39 @@ class AppointmentServiceImpl implements AppointmentService {
   @Transactional(readOnly = true)
   public AppointmentResponse findById(Long hospitalId, Long appointmentId) {
     return enrich(hospitalId, List.of(load(hospitalId, appointmentId))).getFirst();
+  }
+
+  /**
+   * Ranks this appointment among its doctor's still-active appointments for the same
+   * calendar day, ordered by queue number. A closed appointment (completed, cancelled,
+   * no-show) reports position 0 - it's no longer "in" the queue.
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public QueueStatusResponse queueStatus(Long hospitalId, Long appointmentId) {
+    var appointment = load(hospitalId, appointmentId);
+    var day = appointment.getScheduledAt().atZone(ZoneOffset.UTC).toLocalDate();
+    var start = day.atStartOfDay(ZoneOffset.UTC).toInstant();
+    var end = day.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+
+    var activeForDoctor = repository
+        .findByDoctorIdAndScheduledAtBetween(appointment.getDoctorId(), start, end).stream()
+        .filter(candidate -> ACTIVE_QUEUE_STATUSES.contains(candidate.getStatus()))
+        .sorted((a, b) -> Integer.compare(
+            a.getQueueNumber() == null ? Integer.MAX_VALUE : a.getQueueNumber(),
+            b.getQueueNumber() == null ? Integer.MAX_VALUE : b.getQueueNumber()))
+        .toList();
+
+    var position = 0;
+    for (var i = 0; i < activeForDoctor.size(); i++) {
+      if (activeForDoctor.get(i).getId().equals(appointment.getId())) {
+        position = i + 1;
+        break;
+      }
+    }
+
+    return new QueueStatusResponse(appointment.getId(), appointment.getQueueNumber(),
+        appointment.getStatus(), position, Math.max(position - 1, 0), activeForDoctor.size());
   }
 
   @Override

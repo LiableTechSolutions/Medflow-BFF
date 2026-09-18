@@ -10,6 +10,9 @@ import com.medflow.modules.notifications.domain.repository.NotificationRepositor
 import com.medflow.modules.pharmacy.api.MedicationLowStockEvent;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.modulith.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
@@ -19,23 +22,37 @@ import org.springframework.stereotype.Component;
  * event carries its own tenant rather than reading one from a security context.
  */
 @Component
+@EnableConfigurationProperties(NotificationProperties.class)
 class NotificationEventListener {
 
+  private static final Logger log = LoggerFactory.getLogger(NotificationEventListener.class);
   private static final DateTimeFormatter TIME_FORMAT =
       DateTimeFormatter.ofPattern("MMM d, HH:mm 'UTC'").withZone(ZoneOffset.UTC);
 
   private final NotificationRepository repository;
+  private final NotificationProperties properties;
 
-  NotificationEventListener(NotificationRepository repository) {
+  NotificationEventListener(NotificationRepository repository, NotificationProperties properties) {
     this.repository = repository;
+    this.properties = properties;
   }
 
+  /**
+   * No WhatsApp/SMS provider is wired up yet (needs a real account + API credentials —
+   * see the "Appointment Queue, Notifications & Data Fixes" doc's open questions). Until
+   * then, this logs what would have been sent and still raises the in-app notification
+   * with the same message, including a link to the live queue, so the flow is visible
+   * end-to-end without a real external send.
+   */
   @ApplicationModuleListener
   void on(AppointmentBookedEvent event) {
+    var queueLink = properties.frontendBaseUrl() + "/appointments/" + event.appointmentId() + "/queue";
+    var message = event.patientName() + " is scheduled with " + event.doctorName() + " at "
+        + TIME_FORMAT.format(event.scheduledAt()) + ". Live queue: " + queueLink;
     repository.save(new Notification(event.hospitalId(), NotificationCategory.APPOINTMENT,
-        NotificationSeverity.INFO, "Appointment booked",
-        event.patientName() + " is scheduled with " + event.doctorName() + " at "
-            + TIME_FORMAT.format(event.scheduledAt()) + "."));
+        NotificationSeverity.INFO, "Appointment booked", message));
+    log.info("[whatsapp-mock] would notify {} ({}): {}", event.patientName(),
+        event.patientPhone(), message);
   }
 
   @ApplicationModuleListener
