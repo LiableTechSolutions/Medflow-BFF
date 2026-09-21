@@ -3,6 +3,7 @@ package com.medflow.modules.appointments.api;
 import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
+import com.medflow.modules.appointments.api.response.AvailableSlotsResponse;
 import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.shared.api.PageResponse;
 import java.math.BigDecimal;
@@ -19,6 +20,9 @@ public interface AppointmentService {
 
   /** Where this appointment stands in its doctor's live queue for the day. */
   QueueStatusResponse queueStatus(Long hospitalId, Long appointmentId);
+
+  /** Open consulting slots for the doctor on this date, per their configured availability. */
+  AvailableSlotsResponse availableSlots(Long hospitalId, Long doctorId, LocalDate date);
 
   PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
       Long doctorId, Long patientId, LocalDate date, int page, int size);

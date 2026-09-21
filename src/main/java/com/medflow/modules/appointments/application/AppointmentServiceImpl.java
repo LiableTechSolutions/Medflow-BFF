@@ -9,19 +9,23 @@ import com.medflow.modules.appointments.api.DailyAppointmentCount;
 import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
+import com.medflow.modules.appointments.api.response.AvailableSlotsResponse;
 import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.modules.appointments.domain.entity.Appointment;
 import com.medflow.modules.appointments.domain.repository.AppointmentRepository;
 import com.medflow.modules.appointments.domain.repository.AppointmentSpecifications;
 import com.medflow.modules.doctors.api.DoctorService;
 import com.medflow.modules.doctors.api.DoctorSummary;
+import com.medflow.modules.doctors.api.response.DoctorAvailabilityResponse;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.PatientSummary;
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -120,6 +124,53 @@ class AppointmentServiceImpl implements AppointmentService {
 
     return new QueueStatusResponse(appointment.getId(), appointment.getQueueNumber(),
         appointment.getStatus(), position, Math.max(position - 1, 0), activeForDoctor.size());
+  }
+
+  /**
+   * Generates the doctor's consulting slots for this date from their configured
+   * availability, then drops any that overlap an existing (non-cancelled) booking or
+   * have already passed. A specific-date override, when one exists for this date,
+   * replaces the recurring day-of-week rule entirely - including an override that marks
+   * the day unavailable, which correctly yields no slots even on an otherwise-recurring day.
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public AvailableSlotsResponse availableSlots(Long hospitalId, Long doctorId, LocalDate date) {
+    var rules = doctorService.availability(hospitalId, doctorId);
+    var isoDayOfWeek = date.getDayOfWeek().getValue() % 7; // 0 = Sunday, matching AddAvailabilityRequest
+
+    var overridesForDate = rules.stream()
+        .filter(rule -> date.equals(rule.specificDate()))
+        .toList();
+    var windows = (!overridesForDate.isEmpty() ? overridesForDate : rules.stream()
+        .filter(rule -> rule.specificDate() == null && isoDayOfWeek == (rule.dayOfWeek() == null ? -1 : rule.dayOfWeek()))
+        .toList())
+        .stream()
+        .filter(DoctorAvailabilityResponse::available)
+        .toList();
+
+    var start = date.atStartOfDay(ZoneOffset.UTC).toInstant();
+    var end = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    var booked = repository.findByDoctorIdAndScheduledAtBetween(doctorId, start, end).stream()
+        .filter(existing -> existing.getStatus() != AppointmentStatus.CANCELLED)
+        .toList();
+    var now = Instant.now();
+
+    var slots = new ArrayList<Instant>();
+    for (var window : windows) {
+      var duration = Duration.ofMinutes(window.slotDurationMinutes());
+      for (var slotStart = window.startTime(); !slotStart.plus(duration).isAfter(window.endTime());
+          slotStart = slotStart.plus(duration)) {
+        var slotStartInstant = date.atTime(slotStart).atZone(ZoneOffset.UTC).toInstant();
+        var slotEndInstant = slotStartInstant.plus(duration);
+        if (slotStartInstant.isBefore(now)) continue;
+        var taken = booked.stream().anyMatch(existing -> existing.overlaps(slotStartInstant, slotEndInstant));
+        if (!taken) slots.add(slotStartInstant);
+      }
+    }
+    slots.sort(Instant::compareTo);
+
+    return new AvailableSlotsResponse(doctorId, date, slots);
   }
 
   @Override

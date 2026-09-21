@@ -5,6 +5,7 @@ import com.medflow.modules.appointments.api.AppointmentStatus;
 import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
+import com.medflow.modules.appointments.api.response.AvailableSlotsResponse;
 import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.shared.api.ApiResponse;
 import com.medflow.shared.api.PageResponse;
@@ -66,6 +67,16 @@ class AppointmentController {
   ApiResponse<AppointmentResponse> find(@PathVariable Long appointmentId) {
     return ApiResponse.success("Appointment retrieved successfully",
         service.findById(tenantContext.hospitalId(), appointmentId));
+  }
+
+  @GetMapping("/available-slots")
+  @Operation(summary = "Get available slots",
+      description = "Open consulting slots for a doctor on a given day, after subtracting existing bookings.")
+  ApiResponse<AvailableSlotsResponse> availableSlots(
+      @RequestParam Long doctorId,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    return ApiResponse.success("Available slots retrieved successfully",
+        service.availableSlots(tenantContext.hospitalId(), doctorId, date));
   }
 
   @GetMapping("/{appointmentId}/queue-status")

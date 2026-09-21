@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -190,6 +191,41 @@ class MedflowSmokeTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(JsonPath.<List<String>>read(response.getBody(), "$.data.content[*].action"))
         .contains("DOCTOR_CREATED");
+  }
+
+  @Test
+  @Order(10)
+  void availableSlotsExcludeAnAlreadyBookedTime() {
+    var slotDate = LocalDate.now().plusDays(7);
+    var availability = rest.exchange("/api/v1/doctors/" + doctorId + "/availability",
+        HttpMethod.POST, authorized(Map.of(
+            "specificDate", slotDate.toString(),
+            "startTime", "09:00:00",
+            "endTime", "11:00:00",
+            "slotDurationMinutes", 30,
+            "available", true)), String.class);
+    assertThat(availability.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+    var beforeBooking = rest.exchange(
+        "/api/v1/appointments/available-slots?doctorId=" + doctorId + "&date=" + slotDate,
+        HttpMethod.GET, authorized(null), String.class);
+    assertThat(beforeBooking.getStatusCode()).isEqualTo(HttpStatus.OK);
+    List<String> slotsBefore = JsonPath.read(beforeBooking.getBody(), "$.data.slots");
+    assertThat(slotsBefore).hasSize(4);
+
+    var secondSlot = Instant.parse(slotsBefore.get(1));
+    var booking = rest.exchange("/api/v1/appointments", HttpMethod.POST, authorized(Map.of(
+        "patientId", patientId,
+        "doctorId", doctorId,
+        "scheduledAt", secondSlot.toString(),
+        "appointmentMode", "WALK_IN")), String.class);
+    assertThat(booking.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+    var afterBooking = rest.exchange(
+        "/api/v1/appointments/available-slots?doctorId=" + doctorId + "&date=" + slotDate,
+        HttpMethod.GET, authorized(null), String.class);
+    List<String> slotsAfter = JsonPath.read(afterBooking.getBody(), "$.data.slots");
+    assertThat(slotsAfter).hasSize(3).doesNotContain(secondSlot.toString());
   }
 
   private HttpEntity<Map<String, Object>> authorized(Map<String, Object> body) {
