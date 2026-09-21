@@ -8,5 +8,7 @@ public interface HospitalRepository extends JpaRepository<Hospital, Long> {
 
   Optional<Hospital> findByIdAndDeletedFalse(Long id);
 
+  Optional<Hospital> findByHospitalCodeAndDeletedFalse(String hospitalCode);
+
   boolean existsByHospitalCode(String hospitalCode);
 }

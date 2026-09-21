@@ -4,6 +4,7 @@ import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
 import com.medflow.modules.appointments.api.response.AvailableSlotsResponse;
+import com.medflow.modules.appointments.api.response.PublicQueueBoardResponse;
 import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.shared.api.PageResponse;
 import java.math.BigDecimal;
@@ -23,6 +24,13 @@ public interface AppointmentService {
 
   /** Open consulting slots for the doctor on this date, per their configured availability. */
   AvailableSlotsResponse availableSlots(Long hospitalId, Long doctorId, LocalDate date);
+
+  /**
+   * Unauthenticated read-only queue board for a waiting-room TV or a link shared with
+   * patients. {@code hospitalCode} and {@code doctorId} are both required and cross-checked
+   * against each other (no anonymous access to hospital-wide or cross-tenant data).
+   */
+  PublicQueueBoardResponse publicQueueBoard(String hospitalCode, Long doctorId, LocalDate date);
 
   PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
       Long doctorId, Long patientId, LocalDate date, int page, int size);

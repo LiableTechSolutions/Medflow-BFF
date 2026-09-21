@@ -160,10 +160,11 @@ class MedflowSmokeTest {
 
     var notifications = rest.exchange("/api/v1/notifications", HttpMethod.GET, authorized(null),
         String.class);
-    // The live-queue link is hospital-branded: {frontendBaseUrl}/appointments/{hospitalCode}/queue/{id}
+    // The live-queue link is the public, unauthenticated board:
+    // {frontendBaseUrl}/public/{hospitalCode}/queue?doctorId={id}&date={date}
     assertThat(JsonPath.<String>read(notifications.getBody(), "$.data.content[0].message"))
-        .contains("/queue/" + appointmentId)
-        .containsPattern("/appointments/[^/]+/queue/");
+        .contains("doctorId=" + doctorId)
+        .containsPattern("/public/[^/]+/queue\\?");
 
     var queueStatus = rest.exchange("/api/v1/appointments/" + appointmentId + "/queue-status",
         HttpMethod.GET, authorized(null), String.class);
@@ -228,6 +229,21 @@ class MedflowSmokeTest {
         HttpMethod.GET, authorized(null), String.class);
     List<String> slotsAfter = JsonPath.read(afterBooking.getBody(), "$.data.slots");
     assertThat(slotsAfter).hasSize(3).doesNotContain(secondSlot.toString());
+
+    // The public queue board needs no bearer token at all - hospitalCode + doctorId
+    // stand in for tenant scoping on an anonymous request.
+    var hospitalProfile = rest.exchange("/api/v1/hospital", HttpMethod.GET, authorized(null),
+        String.class);
+    String hospitalCode = JsonPath.read(hospitalProfile.getBody(), "$.data.hospitalCode");
+
+    var publicBoard = rest.exchange(
+        "/api/v1/public/queue?hospitalCode=" + hospitalCode + "&doctorId=" + doctorId + "&date=" + slotDate,
+        HttpMethod.GET, HttpEntity.EMPTY, String.class);
+    assertThat(publicBoard.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(JsonPath.<String>read(publicBoard.getBody(), "$.data.doctorName")).isEqualTo("Kabir Shah");
+    assertThat(JsonPath.<Integer>read(publicBoard.getBody(), "$.data.totalActive")).isEqualTo(1);
+    assertThat(JsonPath.<List<Map<String, Object>>>read(publicBoard.getBody(), "$.data.upcoming"))
+        .hasSize(1);
   }
 
   private HttpEntity<Map<String, Object>> authorized(Map<String, Object> body) {

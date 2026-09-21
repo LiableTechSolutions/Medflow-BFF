@@ -10,6 +10,8 @@ import com.medflow.modules.appointments.api.request.BookAppointmentRequest;
 import com.medflow.modules.appointments.api.request.RescheduleAppointmentRequest;
 import com.medflow.modules.appointments.api.response.AppointmentResponse;
 import com.medflow.modules.appointments.api.response.AvailableSlotsResponse;
+import com.medflow.modules.appointments.api.response.PublicQueueBoardResponse;
+import com.medflow.modules.appointments.api.response.PublicQueueEntry;
 import com.medflow.modules.appointments.api.response.QueueStatusResponse;
 import com.medflow.modules.appointments.domain.entity.Appointment;
 import com.medflow.modules.appointments.domain.repository.AppointmentRepository;
@@ -176,6 +178,47 @@ class AppointmentServiceImpl implements AppointmentService {
     slots.sort(Instant::compareTo);
 
     return new AvailableSlotsResponse(doctorId, date, slots);
+  }
+
+  /**
+   * No caller identity here - hospitalCode and doctorId are cross-checked against each
+   * other via {@code doctorService.findById}, which throws if the doctor doesn't belong
+   * to that hospital. That's the only tenant boundary an anonymous request gets.
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public PublicQueueBoardResponse publicQueueBoard(String hospitalCode, Long doctorId, LocalDate date) {
+    var hospital = hospitalService.summaryByCode(hospitalCode);
+    var doctor = requireDoctor(hospital.id(), doctorId);
+
+    var start = date.atStartOfDay(ZoneOffset.UTC).toInstant();
+    var end = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    var active = repository.findByDoctorIdAndScheduledAtBetween(doctorId, start, end).stream()
+        .filter(appointment -> ACTIVE_QUEUE_STATUSES.contains(appointment.getStatus()))
+        .sorted((a, b) -> Integer.compare(
+            a.getQueueNumber() == null ? Integer.MAX_VALUE : a.getQueueNumber(),
+            b.getQueueNumber() == null ? Integer.MAX_VALUE : b.getQueueNumber()))
+        .toList();
+
+    var patientNames = patientService.summariesByIds(hospital.id(),
+            active.stream().map(Appointment::getPatientId).collect(Collectors.toSet())).stream()
+        .collect(Collectors.toMap(PatientSummary::id, PatientSummary::fullName));
+
+    var nowServing = active.stream()
+        .filter(appointment -> appointment.getStatus() == AppointmentStatus.IN_CONSULTATION)
+        .findFirst();
+
+    var upcoming = active.stream()
+        .filter(appointment -> appointment.getStatus() != AppointmentStatus.IN_CONSULTATION)
+        .map(appointment -> new PublicQueueEntry(appointment.getQueueNumber(),
+            patientNames.getOrDefault(appointment.getPatientId(), "Patient"), appointment.getStatus(),
+            appointment.getScheduledAt()))
+        .toList();
+
+    return new PublicQueueBoardResponse(hospital.name(), doctor.fullName(), doctor.specialty(), date,
+        nowServing.map(Appointment::getQueueNumber).orElse(null),
+        nowServing.map(a -> patientNames.getOrDefault(a.getPatientId(), "Patient")).orElse(null),
+        active.size(), upcoming);
   }
 
   @Override
