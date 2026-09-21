@@ -19,6 +19,7 @@ import com.medflow.modules.doctors.api.DoctorSummary;
 import com.medflow.modules.doctors.api.response.DoctorAvailabilityResponse;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.PatientSummary;
+import com.medflow.modules.tenancy.api.HospitalService;
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
@@ -50,13 +51,16 @@ class AppointmentServiceImpl implements AppointmentService {
   private final AppointmentRepository repository;
   private final PatientService patientService;
   private final DoctorService doctorService;
+  private final HospitalService hospitalService;
   private final ApplicationEventPublisher eventPublisher;
 
   AppointmentServiceImpl(AppointmentRepository repository, PatientService patientService,
-      DoctorService doctorService, ApplicationEventPublisher eventPublisher) {
+      DoctorService doctorService, HospitalService hospitalService,
+      ApplicationEventPublisher eventPublisher) {
     this.repository = repository;
     this.patientService = patientService;
     this.doctorService = doctorService;
+    this.hospitalService = hospitalService;
     this.eventPublisher = eventPublisher;
   }
 
@@ -80,9 +84,10 @@ class AppointmentServiceImpl implements AppointmentService {
       eventPublisher.publishEvent(new AppointmentScheduleConflictEvent(hospitalId, doctor.id(),
           doctor.fullName(), appointment.getScheduledAt()));
     }
-    eventPublisher.publishEvent(new AppointmentBookedEvent(hospitalId, appointment.getId(),
-        patient.id(), patient.fullName(), patient.phone(), doctor.id(), doctor.fullName(),
-        appointment.getScheduledAt()));
+    var hospitalCode = hospitalService.summary(hospitalId).hospitalCode();
+    eventPublisher.publishEvent(new AppointmentBookedEvent(hospitalId, hospitalCode,
+        appointment.getId(), patient.id(), patient.fullName(), patient.phone(), doctor.id(),
+        doctor.fullName(), appointment.getScheduledAt()));
 
     return toResponse(appointment, patient.fullName(), doctor);
   }

@@ -160,8 +160,10 @@ class MedflowSmokeTest {
 
     var notifications = rest.exchange("/api/v1/notifications", HttpMethod.GET, authorized(null),
         String.class);
+    // The live-queue link is hospital-branded: {frontendBaseUrl}/appointments/{hospitalCode}/queue/{id}
     assertThat(JsonPath.<String>read(notifications.getBody(), "$.data.content[0].message"))
-        .contains("/appointments/" + appointmentId + "/queue");
+        .contains("/queue/" + appointmentId)
+        .containsPattern("/appointments/[^/]+/queue/");
 
     var queueStatus = rest.exchange("/api/v1/appointments/" + appointmentId + "/queue-status",
         HttpMethod.GET, authorized(null), String.class);

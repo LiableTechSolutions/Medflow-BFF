@@ -46,7 +46,8 @@ class NotificationEventListener {
    */
   @ApplicationModuleListener
   void on(AppointmentBookedEvent event) {
-    var queueLink = properties.frontendBaseUrl() + "/appointments/" + event.appointmentId() + "/queue";
+    var queueLink = properties.frontendBaseUrl() + "/appointments/" + event.hospitalCode()
+        + "/queue/" + event.appointmentId();
     var message = event.patientName() + " is scheduled with " + event.doctorName() + " at "
         + TIME_FORMAT.format(event.scheduledAt()) + ". Live queue: " + queueLink;
     repository.save(new Notification(event.hospitalId(), NotificationCategory.APPOINTMENT,

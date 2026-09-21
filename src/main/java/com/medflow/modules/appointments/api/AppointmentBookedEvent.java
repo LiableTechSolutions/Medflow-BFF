@@ -8,6 +8,7 @@ import java.time.Instant;
  */
 public record AppointmentBookedEvent(
     Long hospitalId,
+    String hospitalCode,
     Long appointmentId,
     Long patientId,
     String patientName,
