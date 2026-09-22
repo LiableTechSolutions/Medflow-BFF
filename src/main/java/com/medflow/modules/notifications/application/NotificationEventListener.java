@@ -28,7 +28,6 @@ class NotificationEventListener {
   private static final Logger log = LoggerFactory.getLogger(NotificationEventListener.class);
   private static final DateTimeFormatter TIME_FORMAT =
       DateTimeFormatter.ofPattern("MMM d, HH:mm 'UTC'").withZone(ZoneOffset.UTC);
-  private static final DateTimeFormatter DATE_ONLY = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
 
   private final NotificationRepository repository;
   private final NotificationProperties properties;
@@ -45,13 +44,14 @@ class NotificationEventListener {
    * with the same message, including a link to the live queue, so the flow is visible
    * end-to-end without a real external send.
    *
-   * <p>The link points at the public, unauthenticated queue board (not the staff-only
-   * per-appointment page) — the patient receiving this has no staff login.
+   * <p>The link carries a pre-signed token (minted by AppointmentServiceImpl, which has
+   * the tenant context this listener doesn't) rather than raw hospital/doctor ids —
+   * unguessable and self-expiring, since the patient receiving this has no staff login
+   * to gate access some other way.
    */
   @ApplicationModuleListener
   void on(AppointmentBookedEvent event) {
-    var queueLink = properties.frontendBaseUrl() + "/public/" + event.hospitalCode()
-        + "/queue?doctorId=" + event.doctorId() + "&date=" + DATE_ONLY.format(event.scheduledAt());
+    var queueLink = properties.frontendBaseUrl() + "/public/queue?token=" + event.queueLinkToken();
     var message = event.patientName() + " is scheduled with " + event.doctorName() + " at "
         + TIME_FORMAT.format(event.scheduledAt()) + ". Live queue: " + queueLink;
     repository.save(new Notification(event.hospitalId(), NotificationCategory.APPOINTMENT,

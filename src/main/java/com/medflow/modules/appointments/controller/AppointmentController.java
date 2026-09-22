@@ -13,6 +13,7 @@ import com.medflow.shared.security.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -85,6 +86,18 @@ class AppointmentController {
   ApiResponse<QueueStatusResponse> queueStatus(@PathVariable Long appointmentId) {
     return ApiResponse.success("Queue status retrieved successfully",
         service.queueStatus(tenantContext.hospitalId(), appointmentId));
+  }
+
+  @GetMapping("/queue-link")
+  @Operation(summary = "Get a public queue board link",
+      description = "Mints a signed, expiring token for the doctor's queue board on this "
+          + "day — the raw ids alone aren't enough to view it. Build the shareable URL as "
+          + "{frontend}/public/queue?token={token}. Staff-only.")
+  ApiResponse<Map<String, String>> queueLink(
+      @RequestParam Long doctorId,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    return ApiResponse.success("Queue link retrieved successfully",
+        Map.of("token", service.issueQueueLinkToken(tenantContext.hospitalId(), doctorId, date)));
   }
 
   @PatchMapping("/{appointmentId}/confirm")

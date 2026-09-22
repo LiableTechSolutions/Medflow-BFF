@@ -54,15 +54,17 @@ class AppointmentServiceImpl implements AppointmentService {
   private final PatientService patientService;
   private final DoctorService doctorService;
   private final HospitalService hospitalService;
+  private final QueueLinkTokenService queueLinkTokenService;
   private final ApplicationEventPublisher eventPublisher;
 
   AppointmentServiceImpl(AppointmentRepository repository, PatientService patientService,
       DoctorService doctorService, HospitalService hospitalService,
-      ApplicationEventPublisher eventPublisher) {
+      QueueLinkTokenService queueLinkTokenService, ApplicationEventPublisher eventPublisher) {
     this.repository = repository;
     this.patientService = patientService;
     this.doctorService = doctorService;
     this.hospitalService = hospitalService;
+    this.queueLinkTokenService = queueLinkTokenService;
     this.eventPublisher = eventPublisher;
   }
 
@@ -87,7 +89,9 @@ class AppointmentServiceImpl implements AppointmentService {
           doctor.fullName(), appointment.getScheduledAt()));
     }
     var hospitalCode = hospitalService.summary(hospitalId).hospitalCode();
-    eventPublisher.publishEvent(new AppointmentBookedEvent(hospitalId, hospitalCode,
+    var queueLinkToken = queueLinkTokenService.issue(hospitalCode, doctor.id(),
+        appointment.getScheduledAt().atZone(ZoneOffset.UTC).toLocalDate());
+    eventPublisher.publishEvent(new AppointmentBookedEvent(hospitalId, queueLinkToken,
         appointment.getId(), patient.id(), patient.fullName(), patient.phone(), doctor.id(),
         doctor.fullName(), appointment.getScheduledAt()));
 
@@ -180,16 +184,29 @@ class AppointmentServiceImpl implements AppointmentService {
     return new AvailableSlotsResponse(doctorId, date, slots);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public String issueQueueLinkToken(Long hospitalId, Long doctorId, LocalDate date) {
+    requireDoctor(hospitalId, doctorId);
+    var hospitalCode = hospitalService.summary(hospitalId).hospitalCode();
+    return queueLinkTokenService.issue(hospitalCode, doctorId, date);
+  }
+
   /**
-   * No caller identity here - hospitalCode and doctorId are cross-checked against each
-   * other via {@code doctorService.findById}, which throws if the doctor doesn't belong
-   * to that hospital. That's the only tenant boundary an anonymous request gets.
+   * No caller identity here - the token is the only credential an anonymous request
+   * has. It is signed and verified server-side (never trusted as raw ids), and its
+   * hospitalCode/doctorId are still cross-checked against each other via
+   * {@code doctorService.findById}, which throws if the doctor doesn't belong to that
+   * hospital - defense in depth even though a valid token already implies that.
    */
   @Override
   @Transactional(readOnly = true)
-  public PublicQueueBoardResponse publicQueueBoard(String hospitalCode, Long doctorId, LocalDate date) {
-    var hospital = hospitalService.summaryByCode(hospitalCode);
-    var doctor = requireDoctor(hospital.id(), doctorId);
+  public PublicQueueBoardResponse publicQueueBoard(String token) {
+    var decoded = queueLinkTokenService.verify(token);
+    var hospital = hospitalService.summaryByCode(decoded.hospitalCode());
+    var doctor = requireDoctor(hospital.id(), decoded.doctorId());
+    var doctorId = decoded.doctorId();
+    var date = decoded.date();
 
     var start = date.atStartOfDay(ZoneOffset.UTC).toInstant();
     var end = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();

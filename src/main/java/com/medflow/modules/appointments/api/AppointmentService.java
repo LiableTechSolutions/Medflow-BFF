@@ -26,11 +26,18 @@ public interface AppointmentService {
   AvailableSlotsResponse availableSlots(Long hospitalId, Long doctorId, LocalDate date);
 
   /**
-   * Unauthenticated read-only queue board for a waiting-room TV or a link shared with
-   * patients. {@code hospitalCode} and {@code doctorId} are both required and cross-checked
-   * against each other (no anonymous access to hospital-wide or cross-tenant data).
+   * Mints a signed, expiring token for the public queue board (a waiting-room TV or a
+   * link shared with a patient) — never raw ids, which would be guessable. Requires a
+   * staff login; {@link #publicQueueBoard} is the anonymous counterpart that verifies it.
    */
-  PublicQueueBoardResponse publicQueueBoard(String hospitalCode, Long doctorId, LocalDate date);
+  String issueQueueLinkToken(Long hospitalId, Long doctorId, LocalDate date);
+
+  /**
+   * Unauthenticated read-only queue board for a waiting-room TV or a link shared with
+   * patients. The token (from {@link #issueQueueLinkToken}) is the only credential an
+   * anonymous caller has — it is verified and decoded here, never trusted as raw ids.
+   */
+  PublicQueueBoardResponse publicQueueBoard(String token);
 
   PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
       Long doctorId, Long patientId, LocalDate date, int page, int size);
