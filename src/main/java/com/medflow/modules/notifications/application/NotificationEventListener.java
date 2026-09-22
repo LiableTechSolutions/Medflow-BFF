@@ -10,8 +10,6 @@ import com.medflow.modules.notifications.domain.repository.NotificationRepositor
 import com.medflow.modules.pharmacy.api.MedicationLowStockEvent;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.modulith.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
@@ -25,24 +23,27 @@ import org.springframework.stereotype.Component;
 @EnableConfigurationProperties(NotificationProperties.class)
 class NotificationEventListener {
 
-  private static final Logger log = LoggerFactory.getLogger(NotificationEventListener.class);
   private static final DateTimeFormatter TIME_FORMAT =
       DateTimeFormatter.ofPattern("MMM d, HH:mm 'UTC'").withZone(ZoneOffset.UTC);
 
   private final NotificationRepository repository;
   private final NotificationProperties properties;
+  private final EmailChannelSender emailSender;
+  private final TwilioChannelSender twilioSender;
 
-  NotificationEventListener(NotificationRepository repository, NotificationProperties properties) {
+  NotificationEventListener(NotificationRepository repository, NotificationProperties properties,
+      EmailChannelSender emailSender, TwilioChannelSender twilioSender) {
     this.repository = repository;
     this.properties = properties;
+    this.emailSender = emailSender;
+    this.twilioSender = twilioSender;
   }
 
   /**
-   * No WhatsApp/SMS provider is wired up yet (needs a real account + API credentials —
-   * see the "Appointment Queue, Notifications & Data Fixes" doc's open questions). Until
-   * then, this logs what would have been sent and still raises the in-app notification
-   * with the same message, including a link to the live queue, so the flow is visible
-   * end-to-end without a real external send.
+   * Always raises the in-app notification. Email/WhatsApp/SMS are attempted too, but
+   * each channel sender logs a mock line instead of a real send until its own account is
+   * configured (SMTP password for email, Twilio Account SID + Auth Token for
+   * WhatsApp/SMS) — see EmailChannelSender / TwilioChannelSender.
    *
    * <p>The link carries a pre-signed token (minted by AppointmentServiceImpl, which has
    * the tenant context this listener doesn't) rather than raw hospital/doctor ids —
@@ -56,8 +57,9 @@ class NotificationEventListener {
         + TIME_FORMAT.format(event.scheduledAt()) + ". Live queue: " + queueLink;
     repository.save(new Notification(event.hospitalId(), NotificationCategory.APPOINTMENT,
         NotificationSeverity.INFO, "Appointment booked", message));
-    log.info("[whatsapp-mock] would notify {} ({}): {}", event.patientName(),
-        event.patientPhone(), message);
+    emailSender.send(event.patientEmail(), "Your appointment is booked", message);
+    twilioSender.sendWhatsApp(event.patientPhone(), message);
+    twilioSender.sendSms(event.patientPhone(), message);
   }
 
   @ApplicationModuleListener

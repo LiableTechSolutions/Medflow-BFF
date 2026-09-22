@@ -6,5 +6,6 @@ public record PatientSummary(
     Long hospitalId,
     String patientCode,
     String fullName,
-    String phone) {
+    String phone,
+    String email) {
 }

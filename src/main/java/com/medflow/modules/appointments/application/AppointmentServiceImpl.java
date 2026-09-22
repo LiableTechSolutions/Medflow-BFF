@@ -92,8 +92,8 @@ class AppointmentServiceImpl implements AppointmentService {
     var queueLinkToken = queueLinkTokenService.issue(hospitalCode, doctor.id(),
         appointment.getScheduledAt().atZone(ZoneOffset.UTC).toLocalDate());
     eventPublisher.publishEvent(new AppointmentBookedEvent(hospitalId, queueLinkToken,
-        appointment.getId(), patient.id(), patient.fullName(), patient.phone(), doctor.id(),
-        doctor.fullName(), appointment.getScheduledAt()));
+        appointment.getId(), patient.id(), patient.fullName(), patient.phone(), patient.email(),
+        doctor.id(), doctor.fullName(), appointment.getScheduledAt()));
 
     return toResponse(appointment, patient.fullName(), doctor);
   }

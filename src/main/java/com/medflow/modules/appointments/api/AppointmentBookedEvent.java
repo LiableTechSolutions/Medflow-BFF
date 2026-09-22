@@ -14,6 +14,7 @@ public record AppointmentBookedEvent(
     Long patientId,
     String patientName,
     String patientPhone,
+    String patientEmail,
     Long doctorId,
     String doctorName,
     Instant scheduledAt) {

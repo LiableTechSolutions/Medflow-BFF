@@ -219,7 +219,8 @@ class PatientServiceImpl implements PatientService {
     }
     return repository.findByHospitalIdAndIdIn(hospitalId, patientIds).stream()
         .map(patient -> new PatientSummary(patient.getId(), patient.getHospitalId(),
-            patient.getPatientCode(), patient.getFullName(), patient.getPhone()))
+            patient.getPatientCode(), patient.getFullName(), patient.getPhone(),
+            patient.getEmail()))
         .toList();
   }
 
