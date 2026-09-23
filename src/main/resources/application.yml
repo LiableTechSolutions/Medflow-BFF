@@ -80,6 +80,10 @@ medflow:
       whatsapp-from: ${TWILIO_WHATSAPP_FROM:}
       # A Twilio phone number capable of sending SMS, e.g. "+15551234567".
       sms-from: ${TWILIO_SMS_FROM:}
+      # Trial WhatsApp senders require an approved Content Template SID instead of
+      # freeform text (see TwilioChannelSender). Leave blank once the Twilio account
+      # is upgraded, so real appointment details go out as plain text again.
+      whatsapp-content-sid: ${TWILIO_WHATSAPP_CONTENT_SID:}
 
 springdoc:
   api-docs.path: /api-docs
