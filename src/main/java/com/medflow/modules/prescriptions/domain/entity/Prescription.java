@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "prescriptions")
@@ -74,6 +75,31 @@ public class Prescription {
     this.createdAt = Instant.now();
     this.updatedAt = this.createdAt;
     this.signedAt = digitallySigned ? this.createdAt : null;
+  }
+
+  /** Still open for edits: active, and only until the day it was issued is over (UTC). */
+  public boolean isEditable() {
+    return status == PrescriptionStatus.ACTIVE
+        && createdAt.atZone(ZoneOffset.UTC).toLocalDate().equals(LocalDate.now(ZoneOffset.UTC));
+  }
+
+  public void update(String diagnosis, String medicinesJson, boolean digitallySigned,
+      LocalDate followUpDate) {
+    requireActive("Only active prescriptions can be edited");
+    if (!isEditable()) {
+      throw new BusinessRuleViolationException(
+          "A prescription can only be edited on the day it was issued");
+    }
+    this.diagnosis = diagnosis;
+    this.medicinesJson = medicinesJson;
+    this.followUpDate = followUpDate;
+    if (digitallySigned && this.signedAt == null) {
+      this.signedAt = Instant.now();
+    } else if (!digitallySigned) {
+      this.signedAt = null;
+    }
+    this.digitallySigned = digitallySigned;
+    touch();
   }
 
   public void complete() {

@@ -12,6 +12,7 @@ import com.medflow.modules.prescriptions.api.PrescriptionSendRequestedEvent;
 import com.medflow.modules.prescriptions.api.PrescriptionService;
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import com.medflow.modules.prescriptions.api.request.CreatePrescriptionRequest;
+import com.medflow.modules.prescriptions.api.request.UpdatePrescriptionRequest;
 import com.medflow.modules.prescriptions.api.response.PrescriptionItemResponse;
 import com.medflow.modules.prescriptions.api.response.PrescriptionResponse;
 import com.medflow.modules.prescriptions.domain.entity.Prescription;
@@ -72,6 +73,20 @@ class PrescriptionServiceImpl implements PrescriptionService {
         !Boolean.FALSE.equals(request.digitallySigned()), request.followUpDate()));
 
     return toResponse(prescription, patient.fullName(), doctor.fullName());
+  }
+
+  @Override
+  @Transactional
+  public PrescriptionResponse update(Long hospitalId, Long prescriptionId,
+      UpdatePrescriptionRequest request) {
+    var prescription = load(hospitalId, prescriptionId);
+    var medicines = request.medicines().stream()
+        .map(item -> new PrescriptionItemResponse(item.medicationName(), item.dosage(),
+            item.frequency(), item.durationDays(), item.instructions()))
+        .toList();
+    prescription.update(request.diagnosis(), writeMedicines(medicines),
+        !Boolean.FALSE.equals(request.digitallySigned()), request.followUpDate());
+    return enrich(hospitalId, List.of(prescription)).getFirst();
   }
 
   @Override
@@ -182,8 +197,8 @@ class PrescriptionServiceImpl implements PrescriptionService {
         prescription.getAppointmentId(), prescription.getPatientId(), patientName,
         prescription.getDoctorId(), doctorName, prescription.getDiagnosis(),
         readMedicines(prescription), prescription.isDigitallySigned(), prescription.getSignedAt(),
-        prescription.getStatus(), prescription.getFollowUpDate(), prescription.getCreatedAt(),
-        prescription.getUpdatedAt());
+        prescription.getStatus(), prescription.getFollowUpDate(), prescription.isEditable(),
+        prescription.getCreatedAt(), prescription.getUpdatedAt());
   }
 
   private PatientSummary requirePatient(Long hospitalId, Long patientId) {

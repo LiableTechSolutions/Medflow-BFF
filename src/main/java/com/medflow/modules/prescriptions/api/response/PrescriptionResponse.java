@@ -19,6 +19,8 @@ public record PrescriptionResponse(
     Instant signedAt,
     PrescriptionStatus status,
     LocalDate followUpDate,
+    /** False once the issue day is over (or the prescription is no longer active). */
+    boolean editable,
     Instant createdAt,
     Instant updatedAt) {
 }

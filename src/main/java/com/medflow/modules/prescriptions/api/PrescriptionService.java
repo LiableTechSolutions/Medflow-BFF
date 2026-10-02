@@ -1,6 +1,7 @@
 package com.medflow.modules.prescriptions.api;
 
 import com.medflow.modules.prescriptions.api.request.CreatePrescriptionRequest;
+import com.medflow.modules.prescriptions.api.request.UpdatePrescriptionRequest;
 import com.medflow.modules.prescriptions.api.response.PrescriptionResponse;
 import com.medflow.shared.api.PageResponse;
 import java.time.LocalDate;
@@ -9,6 +10,10 @@ import java.time.LocalDate;
 public interface PrescriptionService {
 
   PrescriptionResponse create(Long hospitalId, CreatePrescriptionRequest request);
+
+  /** Editable only by the issuing doctor, and only on the day it was issued. */
+  PrescriptionResponse update(Long hospitalId, Long prescriptionId,
+      UpdatePrescriptionRequest request);
 
   PrescriptionResponse findById(Long hospitalId, Long prescriptionId);
 

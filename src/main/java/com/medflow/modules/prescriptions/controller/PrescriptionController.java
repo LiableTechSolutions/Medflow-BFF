@@ -4,6 +4,7 @@ import com.medflow.modules.doctors.api.DoctorService;
 import com.medflow.modules.prescriptions.api.PrescriptionService;
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import com.medflow.modules.prescriptions.api.request.CreatePrescriptionRequest;
+import com.medflow.modules.prescriptions.api.request.UpdatePrescriptionRequest;
 import com.medflow.modules.prescriptions.api.response.PrescriptionResponse;
 import com.medflow.shared.api.ApiResponse;
 import com.medflow.shared.api.PageResponse;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -85,6 +87,19 @@ class PrescriptionController {
   ApiResponse<PrescriptionResponse> find(@PathVariable Long prescriptionId) {
     return ApiResponse.success("Prescription retrieved successfully",
         service.findById(tenantContext.hospitalId(), prescriptionId));
+  }
+
+  @PutMapping("/{prescriptionId}")
+  @PreAuthorize("hasRole('DOCTOR')")
+  @Operation(summary = "Edit prescription",
+      description = "Replaces diagnosis, medicines and the follow-up reminder. Only the issuing "
+          + "doctor, and only on the day it was issued.")
+  ApiResponse<PrescriptionResponse> update(@PathVariable Long prescriptionId,
+      @Valid @RequestBody UpdatePrescriptionRequest request) {
+    var existing = service.findById(tenantContext.hospitalId(), prescriptionId);
+    requireSelf(existing.doctorId());
+    return ApiResponse.success("Prescription updated successfully",
+        service.update(tenantContext.hospitalId(), prescriptionId, request));
   }
 
   @PostMapping("/{prescriptionId}/send")
