@@ -90,6 +90,14 @@ class DoctorServiceImpl implements DoctorService {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public DoctorResponse findByCurrentUser(Long hospitalId, Long userId) {
+    var doctor = repository.findByUserIdAndHospitalId(userId, hospitalId)
+        .orElseThrow(() -> new ResourceNotFoundException("This account has no doctor profile"));
+    return toResponse(doctor, userAccountService.getById(hospitalId, doctor.getUserId()));
+  }
+
+  @Override
   @Transactional
   public DoctorResponse update(Long hospitalId, Long doctorId, UpdateDoctorRequest request) {
     var doctor = load(hospitalId, doctorId);

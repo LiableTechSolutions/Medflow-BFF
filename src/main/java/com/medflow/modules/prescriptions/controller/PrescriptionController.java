@@ -1,5 +1,6 @@
 package com.medflow.modules.prescriptions.controller;
 
+import com.medflow.modules.doctors.api.DoctorService;
 import com.medflow.modules.prescriptions.api.PrescriptionService;
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import com.medflow.modules.prescriptions.api.request.CreatePrescriptionRequest;
@@ -11,6 +12,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,21 +28,38 @@ import org.springframework.web.bind.annotation.RestController;
 class PrescriptionController {
 
   private final PrescriptionService service;
+  private final DoctorService doctorService;
   private final TenantContext tenantContext;
 
-  PrescriptionController(PrescriptionService service, TenantContext tenantContext) {
+  PrescriptionController(PrescriptionService service, DoctorService doctorService,
+      TenantContext tenantContext) {
     this.service = service;
+    this.doctorService = doctorService;
     this.tenantContext = tenantContext;
   }
 
   @PostMapping
+  @PreAuthorize("hasRole('DOCTOR')")
   @Operation(summary = "Issue prescription",
-      description = "Writes a diagnosis with one or more medication lines and signs it.")
+      description = "Writes a diagnosis with one or more medication lines and signs it. "
+          + "The doctor must be writing for themselves.")
   ResponseEntity<ApiResponse<PrescriptionResponse>> create(
       @Valid @RequestBody CreatePrescriptionRequest request) {
+    requireSelf(request.doctorId());
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
         "Prescription created successfully",
         service.create(tenantContext.hospitalId(), request)));
+  }
+
+  /**
+   * A doctor can only ever write a prescription as themselves — never trust a client-supplied
+   * doctorId on its own, even though the field is required for the request shape.
+   */
+  private void requireSelf(Long requestedDoctorId) {
+    var self = doctorService.findByCurrentUser(tenantContext.hospitalId(), tenantContext.userId());
+    if (!self.id().equals(requestedDoctorId)) {
+      throw new AccessDeniedException("A doctor can only write prescriptions as themselves");
+    }
   }
 
   @GetMapping
@@ -63,16 +83,34 @@ class PrescriptionController {
   }
 
   @PatchMapping("/{prescriptionId}/complete")
-  @Operation(summary = "Complete prescription", description = "Marks the course as finished.")
+  @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+  @Operation(summary = "Complete prescription",
+      description = "Marks the course as finished. The authoring doctor or an admin only.")
   ApiResponse<PrescriptionResponse> complete(@PathVariable Long prescriptionId) {
+    requireOwnerOrAdmin(prescriptionId);
     return ApiResponse.success("Prescription completed successfully",
         service.complete(tenantContext.hospitalId(), prescriptionId));
   }
 
   @PatchMapping("/{prescriptionId}/cancel")
-  @Operation(summary = "Cancel prescription", description = "Withdraws an active prescription.")
+  @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+  @Operation(summary = "Cancel prescription",
+      description = "Withdraws an active prescription. The authoring doctor or an admin only.")
   ApiResponse<PrescriptionResponse> cancel(@PathVariable Long prescriptionId) {
+    requireOwnerOrAdmin(prescriptionId);
     return ApiResponse.success("Prescription cancelled successfully",
         service.cancel(tenantContext.hospitalId(), prescriptionId));
+  }
+
+  private void requireOwnerOrAdmin(Long prescriptionId) {
+    var caller = tenantContext.require();
+    if ("ADMIN".equals(caller.roleCode())) {
+      return;
+    }
+    var prescription = service.findById(tenantContext.hospitalId(), prescriptionId);
+    var self = doctorService.findByCurrentUser(tenantContext.hospitalId(), caller.userId());
+    if (!self.id().equals(prescription.doctorId())) {
+      throw new AccessDeniedException("Only the authoring doctor or an admin can do this");
+    }
   }
 }
