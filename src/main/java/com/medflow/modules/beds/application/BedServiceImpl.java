@@ -137,6 +137,39 @@ class BedServiceImpl implements BedService {
     return new BedSummaryResponse(all.size(), available, occupied, maintenance, percent);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.Optional<BedResponse> bedOf(Long hospitalId, Long patientId) {
+    return beds.findByPatientIdAndHospitalId(patientId, hospitalId).map(bed -> {
+      var ward = loadWard(hospitalId, bed.getWardId());
+      var patients = patientService.summariesByIds(hospitalId, List.of(patientId)).stream()
+          .collect(Collectors.toMap(PatientSummary::id, p -> p));
+      return toResponse(bed, ward, patients);
+    });
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<BedResponse> availableBeds(Long hospitalId) {
+    var wardsById = wards.findByHospitalIdOrderByNameAsc(hospitalId).stream()
+        .collect(Collectors.toMap(Ward::getId, w -> w));
+    return beds.findByHospitalIdAndStatus(hospitalId, BedStatus.AVAILABLE).stream()
+        .filter(bed -> wardsById.containsKey(bed.getWardId()))
+        .sorted(java.util.Comparator.comparing((Bed bed) -> wardsById.get(bed.getWardId()).getName())
+            .thenComparingInt(Bed::getBedNumber))
+        .map(bed -> toResponse(bed, wardsById.get(bed.getWardId()), Map.of()))
+        .toList();
+  }
+
+  @Override
+  @Transactional
+  public boolean releaseForPatient(Long hospitalId, Long patientId) {
+    return beds.findByPatientIdAndHospitalId(patientId, hospitalId).map(bed -> {
+      bed.release();
+      return true;
+    }).orElse(false);
+  }
+
   private void addBedsTo(Ward ward, int count) {
     int next = beds.highestBedNumber(ward.getId());
     for (int i = 1; i <= count; i++) {

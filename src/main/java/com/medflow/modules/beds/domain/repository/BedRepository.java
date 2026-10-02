@@ -21,6 +21,10 @@ public interface BedRepository extends JpaRepository<Bed, Long> {
 
   boolean existsByPatientId(Long patientId);
 
+  Optional<Bed> findByPatientIdAndHospitalId(Long patientId, Long hospitalId);
+
+  List<Bed> findByHospitalIdAndStatus(Long hospitalId, BedStatus status);
+
   @Query("SELECT COALESCE(MAX(b.bedNumber), 0) FROM Bed b WHERE b.wardId = :wardId")
   int highestBedNumber(@Param("wardId") Long wardId);
 }

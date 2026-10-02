@@ -30,4 +30,13 @@ public interface BedService {
   BedResponse setMaintenance(Long hospitalId, Long bedId, boolean underMaintenance);
 
   BedSummaryResponse summary(Long hospitalId);
+
+  /** The bed this patient is currently in, if any. */
+  java.util.Optional<BedResponse> bedOf(Long hospitalId, Long patientId);
+
+  /** Every free bed across all wards, for picking one at admission time. */
+  List<BedResponse> availableBeds(Long hospitalId);
+
+  /** Frees the patient's bed, if they have one (used on discharge). Returns whether one was freed. */
+  boolean releaseForPatient(Long hospitalId, Long patientId);
 }

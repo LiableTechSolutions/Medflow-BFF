@@ -1,6 +1,7 @@
 package com.medflow.modules.patients.application;
 
 import com.medflow.modules.patients.api.HospitalisationStatus;
+import com.medflow.modules.patients.api.PatientDischargedEvent;
 import com.medflow.modules.patients.api.MappingRelation;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.PatientSummary;
@@ -60,13 +61,16 @@ class PatientServiceImpl implements PatientService {
   private final DailyAnalysisRepository dailyAnalysisRepository;
   private final UserAccountService userAccountService;
   private final PatientRegistrationProfileValidator profileValidator;
+  private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
   PatientServiceImpl(PatientRepository repository,
       PatientMedicalHistoryRepository historyRepository,
       PatientReportRepository reportRepository, UserPatientMappingRepository mappingRepository,
       HospitalisationRecordRepository hospitalisationRepository,
       DailyAnalysisRepository dailyAnalysisRepository,
-      UserAccountService userAccountService, PatientRegistrationProfileValidator profileValidator) {
+      UserAccountService userAccountService, PatientRegistrationProfileValidator profileValidator,
+      org.springframework.context.ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
     this.repository = repository;
     this.historyRepository = historyRepository;
     this.reportRepository = reportRepository;
@@ -255,6 +259,8 @@ class PatientServiceImpl implements PatientService {
             "Patient has no active hospitalisation to discharge"));
     record.discharge(request.dischargeDate());
     patient.dischargeFromHospital();
+    // The Beds module frees whatever bed this patient was lying in.
+    eventPublisher.publishEvent(new PatientDischargedEvent(hospitalId, patientId));
     return toResponse(record);
   }
 

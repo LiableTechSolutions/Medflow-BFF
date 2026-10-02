@@ -84,6 +84,20 @@ class BedController {
         service.reduceBeds(tenantContext.hospitalId(), wardId, request));
   }
 
+  @GetMapping("/available")
+  @Operation(summary = "Free beds", description = "Every free bed across all wards, to pick one at admission.")
+  ApiResponse<List<BedResponse>> available() {
+    return ApiResponse.success("Available beds retrieved successfully",
+        service.availableBeds(tenantContext.hospitalId()));
+  }
+
+  @GetMapping("/patients/{patientId}")
+  @Operation(summary = "A patient's bed", description = "The bed this patient is in; data is absent when they have none.")
+  ApiResponse<BedResponse> ofPatient(@PathVariable Long patientId) {
+    return ApiResponse.success("Patient bed retrieved successfully",
+        service.bedOf(tenantContext.hospitalId(), patientId).orElse(null));
+  }
+
   @PatchMapping("/{bedId}/assign")
   @PreAuthorize(WARD_STAFF)
   @Operation(summary = "Assign a patient to a bed")
