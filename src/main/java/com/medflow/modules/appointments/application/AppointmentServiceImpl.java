@@ -241,11 +241,13 @@ class AppointmentServiceImpl implements AppointmentService {
   @Override
   @Transactional(readOnly = true)
   public PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
-      Long doctorId, Long patientId, LocalDate date, int page, int size) {
+      Long doctorId, Long patientId, LocalDate date, LocalDate from, LocalDate to,
+      boolean latestFirst, int page, int size) {
     var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
-        Sort.by(Sort.Direction.ASC, "scheduledAt"));
+        Sort.by(latestFirst ? Sort.Direction.DESC : Sort.Direction.ASC, "scheduledAt"));
     var result = repository.findAll(
-        AppointmentSpecifications.withFilters(hospitalId, status, doctorId, patientId, date),
+        AppointmentSpecifications.withFilters(hospitalId, status, doctorId, patientId, date,
+            from, to),
         pageable);
     return new PageResponse<>(enrich(hospitalId, result.getContent()), result.getNumber(),
         result.getSize(), result.getTotalElements(), result.getTotalPages());

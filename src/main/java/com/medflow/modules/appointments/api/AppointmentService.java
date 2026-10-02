@@ -40,7 +40,8 @@ public interface AppointmentService {
   PublicQueueBoardResponse publicQueueBoard(String token);
 
   PageResponse<AppointmentResponse> search(Long hospitalId, AppointmentStatus status,
-      Long doctorId, Long patientId, LocalDate date, int page, int size);
+      Long doctorId, Long patientId, LocalDate date, LocalDate from, LocalDate to,
+      boolean latestFirst, int page, int size);
 
   /** Moves the appointment through its workflow; illegal transitions are rejected. */
   AppointmentResponse transition(Long hospitalId, Long appointmentId, AppointmentStatus target);

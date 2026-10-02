@@ -57,10 +57,14 @@ class AppointmentController {
       @RequestParam(required = false) Long doctorId,
       @RequestParam(required = false) Long patientId,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+      @RequestParam(defaultValue = "false") boolean latestFirst,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    return ApiResponse.success("Appointments retrieved successfully",
-        service.search(tenantContext.hospitalId(), status, doctorId, patientId, date, page, size));
+    return ApiResponse.success("Appointments retrieved successfully", service.search(
+        tenantContext.hospitalId(), status, doctorId, patientId, date, from, to, latestFirst, page,
+        size));
   }
 
   @GetMapping("/{appointmentId}")
