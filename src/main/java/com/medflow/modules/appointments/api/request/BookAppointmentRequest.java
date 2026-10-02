@@ -1,6 +1,7 @@
 package com.medflow.modules.appointments.api.request;
 
 import com.medflow.modules.appointments.api.AppointmentMode;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -10,7 +11,7 @@ import java.time.Instant;
 public record BookAppointmentRequest(
     @NotNull Long patientId,
     @NotNull Long doctorId,
-    @NotNull Instant scheduledAt,
+    @NotNull @FutureOrPresent Instant scheduledAt,
     AppointmentMode appointmentMode,
     @Min(5) @Max(240) Integer durationMinutes,
     @Size(max = 255) String reason,

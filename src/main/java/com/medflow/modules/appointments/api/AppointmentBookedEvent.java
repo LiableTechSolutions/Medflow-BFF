@@ -8,9 +8,13 @@ import java.time.Instant;
  */
 public record AppointmentBookedEvent(
     Long hospitalId,
+    /** A pre-signed token for the public queue board link — see QueueLinkTokenService. */
+    String queueLinkToken,
     Long appointmentId,
     Long patientId,
     String patientName,
+    String patientPhone,
+    String patientEmail,
     Long doctorId,
     String doctorName,
     Instant scheduledAt) {

@@ -15,7 +15,7 @@ public final class AppointmentSpecifications {
   }
 
   public static Specification<Appointment> withFilters(Long hospitalId, AppointmentStatus status,
-      Long doctorId, Long patientId, LocalDate date) {
+      Long doctorId, Long patientId, LocalDate date, LocalDate from, LocalDate to) {
     return (root, query, builder) -> {
       var predicates = new ArrayList<Predicate>();
       predicates.add(builder.equal(root.get("hospitalId"), hospitalId));
@@ -33,6 +33,14 @@ public final class AppointmentSpecifications {
         var end = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         predicates.add(builder.greaterThanOrEqualTo(root.get("scheduledAt"), start));
         predicates.add(builder.lessThan(root.get("scheduledAt"), end));
+      }
+      if (from != null) {
+        predicates.add(builder.greaterThanOrEqualTo(root.get("scheduledAt"),
+            from.atStartOfDay(ZoneOffset.UTC).toInstant()));
+      }
+      if (to != null) {
+        predicates.add(builder.lessThan(root.get("scheduledAt"),
+            to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()));
       }
       return builder.and(predicates.toArray(Predicate[]::new));
     };

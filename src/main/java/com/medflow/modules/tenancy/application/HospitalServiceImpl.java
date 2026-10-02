@@ -69,6 +69,13 @@ class HospitalServiceImpl implements HospitalService {
     return mapper.toSummary(load(hospitalId));
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public HospitalSummary summaryByCode(String hospitalCode) {
+    return mapper.toSummary(repository.findByHospitalCodeAndDeletedFalse(hospitalCode)
+        .orElseThrow(() -> new ResourceNotFoundException("Hospital not found: " + hospitalCode)));
+  }
+
   /** A new workspace gets every generally available (phase 1) module switched on. */
   private void entitleGenerallyAvailableModules(Long hospitalId) {
     moduleRepository.findAllByOrderByPhaseAscIdAsc().forEach(module -> {

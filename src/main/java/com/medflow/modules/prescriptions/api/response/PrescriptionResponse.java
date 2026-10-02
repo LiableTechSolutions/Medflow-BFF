@@ -2,6 +2,7 @@ package com.medflow.modules.prescriptions.api.response;
 
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 public record PrescriptionResponse(
@@ -17,6 +18,9 @@ public record PrescriptionResponse(
     boolean digitallySigned,
     Instant signedAt,
     PrescriptionStatus status,
+    LocalDate followUpDate,
+    /** False once the issue day is over (or the prescription is no longer active). */
+    boolean editable,
     Instant createdAt,
     Instant updatedAt) {
 }

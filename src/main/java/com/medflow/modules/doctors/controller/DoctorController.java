@@ -70,6 +70,14 @@ class DoctorController {
         service.search(tenantContext.hospitalId(), query, specialty, status, page, size));
   }
 
+  @GetMapping("/me")
+  @Operation(summary = "Get my doctor profile",
+      description = "Resolves the signed-in user to their own doctor profile, if they have one.")
+  ApiResponse<DoctorResponse> me() {
+    return ApiResponse.success("Doctor profile retrieved successfully",
+        service.findByCurrentUser(tenantContext.hospitalId(), tenantContext.userId()));
+  }
+
   @GetMapping("/{doctorId}")
   @Operation(summary = "Get doctor", description = "Returns a doctor's profile by identifier.")
   ApiResponse<DoctorResponse> find(@PathVariable Long doctorId) {

@@ -38,6 +38,7 @@ public record PatientResponse(
     String guardianRelationship,
     String guardianMobile,
     AccountStatus status,
+    boolean isHospitalised,
     Instant createdAt,
     Instant updatedAt) {
 }

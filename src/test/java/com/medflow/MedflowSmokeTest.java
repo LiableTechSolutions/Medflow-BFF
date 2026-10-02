@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,6 +149,7 @@ class MedflowSmokeTest {
         .isEqualTo("Meera Joshi");
     assertThat(JsonPath.<String>read(response.getBody(), "$.data.status")).isEqualTo("BOOKED");
     assertThat(JsonPath.<Integer>read(response.getBody(), "$.data.queueNumber")).isEqualTo(1);
+    Integer appointmentId = JsonPath.read(response.getBody(), "$.data.id");
 
     await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
       var unread = rest.exchange("/api/v1/notifications/unread-count", HttpMethod.GET,
@@ -155,6 +157,20 @@ class MedflowSmokeTest {
       assertThat(unread.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(JsonPath.<Integer>read(unread.getBody(), "$.data.unread")).isGreaterThan(0);
     });
+
+    var notifications = rest.exchange("/api/v1/notifications", HttpMethod.GET, authorized(null),
+        String.class);
+    // The live-queue link is the public, unauthenticated board, addressed by a signed
+    // token rather than raw ids: {frontendBaseUrl}/public/queue?token={token}
+    assertThat(JsonPath.<String>read(notifications.getBody(), "$.data.content[0].message"))
+        .containsPattern("/public/queue\\?token=[^\\s]+");
+
+    var queueStatus = rest.exchange("/api/v1/appointments/" + appointmentId + "/queue-status",
+        HttpMethod.GET, authorized(null), String.class);
+    assertThat(queueStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(JsonPath.<Integer>read(queueStatus.getBody(), "$.data.position")).isEqualTo(1);
+    assertThat(JsonPath.<Integer>read(queueStatus.getBody(), "$.data.aheadCount")).isZero();
+    assertThat(JsonPath.<Integer>read(queueStatus.getBody(), "$.data.totalActive")).isEqualTo(1);
   }
 
   @Test
@@ -177,6 +193,62 @@ class MedflowSmokeTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(JsonPath.<List<String>>read(response.getBody(), "$.data.content[*].action"))
         .contains("DOCTOR_CREATED");
+  }
+
+  @Test
+  @Order(10)
+  void availableSlotsExcludeAnAlreadyBookedTime() {
+    var slotDate = LocalDate.now().plusDays(7);
+    var availability = rest.exchange("/api/v1/doctors/" + doctorId + "/availability",
+        HttpMethod.POST, authorized(Map.of(
+            "specificDate", slotDate.toString(),
+            "startTime", "09:00:00",
+            "endTime", "11:00:00",
+            "slotDurationMinutes", 30,
+            "available", true)), String.class);
+    assertThat(availability.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+    var beforeBooking = rest.exchange(
+        "/api/v1/appointments/available-slots?doctorId=" + doctorId + "&date=" + slotDate,
+        HttpMethod.GET, authorized(null), String.class);
+    assertThat(beforeBooking.getStatusCode()).isEqualTo(HttpStatus.OK);
+    List<String> slotsBefore = JsonPath.read(beforeBooking.getBody(), "$.data.slots");
+    assertThat(slotsBefore).hasSize(4);
+
+    var secondSlot = Instant.parse(slotsBefore.get(1));
+    var booking = rest.exchange("/api/v1/appointments", HttpMethod.POST, authorized(Map.of(
+        "patientId", patientId,
+        "doctorId", doctorId,
+        "scheduledAt", secondSlot.toString(),
+        "appointmentMode", "WALK_IN")), String.class);
+    assertThat(booking.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+    var afterBooking = rest.exchange(
+        "/api/v1/appointments/available-slots?doctorId=" + doctorId + "&date=" + slotDate,
+        HttpMethod.GET, authorized(null), String.class);
+    List<String> slotsAfter = JsonPath.read(afterBooking.getBody(), "$.data.slots");
+    assertThat(slotsAfter).hasSize(3).doesNotContain(secondSlot.toString());
+
+    // The public queue board takes no raw ids at all - only a signed token a staff
+    // member mints first. Anonymous access needs no bearer token, but does need a
+    // genuine token; a tampered one is rejected outright.
+    var queueLink = rest.exchange(
+        "/api/v1/appointments/queue-link?doctorId=" + doctorId + "&date=" + slotDate,
+        HttpMethod.GET, authorized(null), String.class);
+    assertThat(queueLink.getStatusCode()).isEqualTo(HttpStatus.OK);
+    String token = JsonPath.read(queueLink.getBody(), "$.data.token");
+
+    var publicBoard = rest.exchange("/api/v1/public/queue?token=" + token, HttpMethod.GET,
+        HttpEntity.EMPTY, String.class);
+    assertThat(publicBoard.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(JsonPath.<String>read(publicBoard.getBody(), "$.data.doctorName")).isEqualTo("Kabir Shah");
+    assertThat(JsonPath.<Integer>read(publicBoard.getBody(), "$.data.totalActive")).isEqualTo(1);
+    assertThat(JsonPath.<List<Map<String, Object>>>read(publicBoard.getBody(), "$.data.upcoming"))
+        .hasSize(1);
+
+    var tamperedBoard = rest.exchange("/api/v1/public/queue?token=" + token + "tampered",
+        HttpMethod.GET, HttpEntity.EMPTY, String.class);
+    assertThat(tamperedBoard.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
   }
 
   private HttpEntity<Map<String, Object>> authorized(Map<String, Object> body) {

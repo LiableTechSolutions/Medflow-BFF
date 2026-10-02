@@ -20,6 +20,9 @@ public interface DoctorService {
 
   DoctorResponse findById(Long hospitalId, Long doctorId);
 
+  /** The logged-in user's own doctor profile. Not every user account is a doctor. */
+  DoctorResponse findByCurrentUser(Long hospitalId, Long userId);
+
   DoctorResponse update(Long hospitalId, Long doctorId, UpdateDoctorRequest request);
 
   DoctorResponse changeStatus(Long hospitalId, Long doctorId, AccountStatus status);

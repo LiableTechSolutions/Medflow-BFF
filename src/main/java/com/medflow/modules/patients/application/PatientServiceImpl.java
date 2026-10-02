@@ -1,21 +1,33 @@
 package com.medflow.modules.patients.application;
 
+import com.medflow.modules.patients.api.HospitalisationStatus;
+import com.medflow.modules.patients.api.PatientDischargedEvent;
 import com.medflow.modules.patients.api.MappingRelation;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.PatientSummary;
 import com.medflow.modules.patients.api.request.AddMedicalHistoryRequest;
 import com.medflow.modules.patients.api.request.AddPatientReportRequest;
+import com.medflow.modules.patients.api.request.AdmitPatientRequest;
+import com.medflow.modules.patients.api.request.CreateDailyAnalysisRequest;
 import com.medflow.modules.patients.api.request.CreatePatientRequest;
+import com.medflow.modules.patients.api.request.DischargePatientRequest;
 import com.medflow.modules.patients.api.request.LinkPatientAccountRequest;
 import com.medflow.modules.patients.api.request.UpdatePatientRequest;
+import com.medflow.modules.patients.api.response.DailyAnalysisResponse;
+import com.medflow.modules.patients.api.response.HospitalisationRecordResponse;
 import com.medflow.modules.patients.api.response.MedicalHistoryResponse;
 import com.medflow.modules.patients.api.response.PatientAccountResponse;
+import com.medflow.modules.patients.api.response.PatientClinicalSummaryResponse;
 import com.medflow.modules.patients.api.response.PatientReportResponse;
 import com.medflow.modules.patients.api.response.PatientResponse;
+import com.medflow.modules.patients.domain.entity.DailyAnalysis;
+import com.medflow.modules.patients.domain.entity.HospitalisationRecord;
 import com.medflow.modules.patients.domain.entity.Patient;
 import com.medflow.modules.patients.domain.entity.PatientMedicalHistory;
 import com.medflow.modules.patients.domain.entity.PatientReport;
 import com.medflow.modules.patients.domain.entity.UserPatientMapping;
+import com.medflow.modules.patients.domain.repository.DailyAnalysisRepository;
+import com.medflow.modules.patients.domain.repository.HospitalisationRecordRepository;
 import com.medflow.modules.patients.domain.repository.PatientMedicalHistoryRepository;
 import com.medflow.modules.patients.domain.repository.PatientReportRepository;
 import com.medflow.modules.patients.domain.repository.PatientRepository;
@@ -25,6 +37,7 @@ import com.medflow.modules.users.api.UserAccountService;
 import com.medflow.modules.users.api.UserSummary;
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.domain.AccountStatus;
+import com.medflow.shared.exception.BusinessRuleViolationException;
 import com.medflow.shared.exception.DuplicateResourceException;
 import com.medflow.shared.exception.ResourceNotFoundException;
 import java.util.Collection;
@@ -44,17 +57,26 @@ class PatientServiceImpl implements PatientService {
   private final PatientMedicalHistoryRepository historyRepository;
   private final PatientReportRepository reportRepository;
   private final UserPatientMappingRepository mappingRepository;
+  private final HospitalisationRecordRepository hospitalisationRepository;
+  private final DailyAnalysisRepository dailyAnalysisRepository;
   private final UserAccountService userAccountService;
   private final PatientRegistrationProfileValidator profileValidator;
+  private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
   PatientServiceImpl(PatientRepository repository,
       PatientMedicalHistoryRepository historyRepository,
       PatientReportRepository reportRepository, UserPatientMappingRepository mappingRepository,
-      UserAccountService userAccountService, PatientRegistrationProfileValidator profileValidator) {
+      HospitalisationRecordRepository hospitalisationRepository,
+      DailyAnalysisRepository dailyAnalysisRepository,
+      UserAccountService userAccountService, PatientRegistrationProfileValidator profileValidator,
+      org.springframework.context.ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
     this.repository = repository;
     this.historyRepository = historyRepository;
     this.reportRepository = reportRepository;
     this.mappingRepository = mappingRepository;
+    this.hospitalisationRepository = hospitalisationRepository;
+    this.dailyAnalysisRepository = dailyAnalysisRepository;
     this.userAccountService = userAccountService;
     this.profileValidator = profileValidator;
   }
@@ -76,6 +98,14 @@ class PatientServiceImpl implements PatientService {
         request.governmentIdNumber(), request.allergies(), request.consentStatus(),
         request.referringPhysician(), request.guardianName(), request.guardianRelationship(),
         request.guardianMobile()));
+
+    if (Boolean.TRUE.equals(request.isHospitalised())) {
+      if (request.hospitalisation() == null) {
+        throw new BusinessRuleViolationException(
+            "Admission details are required when creating a hospitalised patient");
+      }
+      admit(hospitalId, patient, request.hospitalisation());
+    }
     return toResponse(patient);
   }
 
@@ -193,7 +223,8 @@ class PatientServiceImpl implements PatientService {
     }
     return repository.findByHospitalIdAndIdIn(hospitalId, patientIds).stream()
         .map(patient -> new PatientSummary(patient.getId(), patient.getHospitalId(),
-            patient.getPatientCode(), patient.getFullName(), patient.getPhone()))
+            patient.getPatientCode(), patient.getFullName(), patient.getPhone(),
+            patient.getEmail()))
         .toList();
   }
 
@@ -201,6 +232,85 @@ class PatientServiceImpl implements PatientService {
   @Transactional(readOnly = true)
   public long countByHospital(Long hospitalId) {
     return repository.countByHospitalIdAndDeletedFalse(hospitalId);
+  }
+
+  @Override
+  @Transactional
+  public HospitalisationRecordResponse admitPatient(Long hospitalId, Long patientId,
+      AdmitPatientRequest request) {
+    var patient = load(hospitalId, patientId);
+    if (hospitalisationRepository
+        .findFirstByPatientIdAndStatusOrderByAdmissionDateDesc(patientId, HospitalisationStatus.ADMITTED)
+        .isPresent()) {
+      throw new BusinessRuleViolationException("Patient already has an active hospitalisation");
+    }
+    var record = admit(hospitalId, patient, request);
+    return toResponse(record);
+  }
+
+  @Override
+  @Transactional
+  public HospitalisationRecordResponse dischargePatient(Long hospitalId, Long patientId,
+      DischargePatientRequest request) {
+    var patient = load(hospitalId, patientId);
+    var record = hospitalisationRepository
+        .findFirstByPatientIdAndStatusOrderByAdmissionDateDesc(patientId, HospitalisationStatus.ADMITTED)
+        .orElseThrow(() -> new BusinessRuleViolationException(
+            "Patient has no active hospitalisation to discharge"));
+    record.discharge(request.dischargeDate());
+    patient.dischargeFromHospital();
+    // The Beds module frees whatever bed this patient was lying in.
+    eventPublisher.publishEvent(new PatientDischargedEvent(hospitalId, patientId));
+    return toResponse(record);
+  }
+
+  @Override
+  @Transactional
+  public DailyAnalysisResponse addDailyAnalysis(Long hospitalId, Long patientId,
+      CreateDailyAnalysisRequest request) {
+    load(hospitalId, patientId);
+    var record = hospitalisationRepository
+        .findFirstByPatientIdAndStatusOrderByAdmissionDateDesc(patientId, HospitalisationStatus.ADMITTED)
+        .orElseThrow(() -> new BusinessRuleViolationException(
+            "Daily analysis requires an active hospitalisation record"));
+    var entry = dailyAnalysisRepository.save(new DailyAnalysis(record.getId(), patientId,
+        request.bloodPressure(), request.pulse(), request.temperature(), request.spo2(),
+        request.notes(), request.recordedByDoctorId()));
+    return toResponse(entry);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<DailyAnalysisResponse> dailyAnalyses(Long hospitalId, Long patientId) {
+    load(hospitalId, patientId);
+    return dailyAnalysisRepository.findByPatientIdOrderByRecordedAtAsc(patientId).stream()
+        .map(this::toResponse)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PatientClinicalSummaryResponse summary(Long hospitalId, Long patientId) {
+    var patient = load(hospitalId, patientId);
+    var currentRecord = hospitalisationRepository
+        .findFirstByPatientIdOrderByAdmissionDateDesc(patientId).orElse(null);
+    var dailyEntries = currentRecord == null
+        ? List.<DailyAnalysisResponse>of()
+        : dailyAnalysisRepository
+            .findByHospitalisationRecordIdOrderByRecordedAtAsc(currentRecord.getId()).stream()
+            .map(this::toResponse)
+            .toList();
+    return new PatientClinicalSummaryResponse(toResponse(patient), patient.isHospitalised(),
+        currentRecord == null ? null : toResponse(currentRecord), dailyEntries);
+  }
+
+  /** Shared by patient creation (inline admission) and the standalone admit endpoint. */
+  private HospitalisationRecord admit(Long hospitalId, Patient patient, AdmitPatientRequest request) {
+    var record = hospitalisationRepository.save(new HospitalisationRecord(hospitalId,
+        patient.getId(), request.admissionDate(), request.ward(), request.bed(),
+        request.admittingDoctorId()));
+    patient.admit();
+    return record;
   }
 
   /** Readable, per-tenant sequence: PAT-000001, PAT-000002, … */
@@ -224,7 +334,20 @@ class PatientServiceImpl implements PatientService {
         patient.getGovernmentIdType(), patient.getGovernmentIdNumber(), patient.getAllergies(),
         patient.getConsentStatus(), patient.getReferringPhysician(), patient.getGuardianName(),
         patient.getGuardianRelationship(), patient.getGuardianMobile(), patient.getStatus(),
-        patient.getCreatedAt(), patient.getUpdatedAt());
+        patient.isHospitalised(), patient.getCreatedAt(), patient.getUpdatedAt());
+  }
+
+  private HospitalisationRecordResponse toResponse(HospitalisationRecord record) {
+    return new HospitalisationRecordResponse(record.getId(), record.getPatientId(),
+        record.getHospitalId(), record.getAdmissionDate(), record.getDischargeDate(),
+        record.getWard(), record.getBed(), record.getAdmittingDoctorId(), record.getStatus(),
+        record.getCreatedAt(), record.getUpdatedAt());
+  }
+
+  private DailyAnalysisResponse toResponse(DailyAnalysis entry) {
+    return new DailyAnalysisResponse(entry.getId(), entry.getHospitalisationRecordId(),
+        entry.getPatientId(), entry.getBloodPressure(), entry.getPulse(), entry.getTemperature(),
+        entry.getSpo2(), entry.getNotes(), entry.getRecordedByDoctorId(), entry.getRecordedAt());
   }
 
   private MedicalHistoryResponse toResponse(PatientMedicalHistory entry) {

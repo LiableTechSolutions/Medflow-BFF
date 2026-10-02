@@ -18,4 +18,7 @@ public interface HospitalService {
   HospitalResponse update(Long hospitalId, UpdateHospitalRequest request);
 
   HospitalSummary summary(Long hospitalId);
+
+  /** Resolves a hospital by its short code (e.g. the one in a public/shareable URL). */
+  HospitalSummary summaryByCode(String hospitalCode);
 }

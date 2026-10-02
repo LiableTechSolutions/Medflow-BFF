@@ -36,6 +36,18 @@ spring:
       port: ${REDIS_PORT:6379}
   jackson:
     default-property-inclusion: non_null
+  mail:
+    # Defaults target SendGrid's SMTP relay (username is literally "apikey"; the
+    # password is the SendGrid API key). Point at a different provider by overriding
+    # SMTP_HOST/SMTP_PORT/SMTP_USERNAME. An empty SMTP_PASSWORD means no account is
+    # configured yet — EmailChannelSender logs a mock line instead of sending.
+    host: ${SMTP_HOST:smtp.sendgrid.net}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:apikey}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
 
 server:
   port: ${SERVER_PORT:8080}
@@ -53,6 +65,25 @@ medflow:
     # "simple" keeps local development dependency-free (in-memory caches).
     # Set to "redis" when a Redis instance is available.
     provider: ${CACHE_PROVIDER:simple}
+  notifications:
+    # Used to build the live-queue link included in appointment notifications.
+    frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+    # Must be a sender address verified in your email provider's dashboard (SendGrid:
+    # Settings > Sender Authentication) or real sends will be rejected even with a
+    # valid API key.
+    from-email: ${MAIL_FROM_ADDRESS:notifications@medflow.local}
+    twilio:
+      # Empty by default — no account configured, so WhatsApp/SMS log a mock line.
+      account-sid: ${TWILIO_ACCOUNT_SID:}
+      auth-token: ${TWILIO_AUTH_TOKEN:}
+      # Sandbox default while on a Twilio trial; e.g. "whatsapp:+14155238886".
+      whatsapp-from: ${TWILIO_WHATSAPP_FROM:}
+      # A Twilio phone number capable of sending SMS, e.g. "+15551234567".
+      sms-from: ${TWILIO_SMS_FROM:}
+      # Trial WhatsApp senders require an approved Content Template SID instead of
+      # freeform text (see TwilioChannelSender). Leave blank once the Twilio account
+      # is upgraded, so real appointment details go out as plain text again.
+      whatsapp-content-sid: ${TWILIO_WHATSAPP_CONTENT_SID:}
 
 springdoc:
   api-docs.path: /api-docs

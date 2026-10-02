@@ -9,6 +9,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "prescriptions")
@@ -40,6 +42,10 @@ public class Prescription {
   @Column(name = "digitally_signed", nullable = false)
   private boolean digitallySigned;
 
+  /** When the patient should come back; a daily job reminds them the day before. */
+  @Column(name = "follow_up_date")
+  private LocalDate followUpDate;
+
   @Column(name = "signed_at")
   private Instant signedAt;
 
@@ -56,7 +62,7 @@ public class Prescription {
   }
 
   public Prescription(Long hospitalId, Long appointmentId, Long doctorId, Long patientId,
-      String diagnosis, String medicinesJson, boolean digitallySigned) {
+      String diagnosis, String medicinesJson, boolean digitallySigned, LocalDate followUpDate) {
     this.hospitalId = hospitalId;
     this.appointmentId = appointmentId;
     this.doctorId = doctorId;
@@ -64,10 +70,36 @@ public class Prescription {
     this.diagnosis = diagnosis;
     this.medicinesJson = medicinesJson;
     this.digitallySigned = digitallySigned;
+    this.followUpDate = followUpDate;
     this.status = PrescriptionStatus.ACTIVE;
     this.createdAt = Instant.now();
     this.updatedAt = this.createdAt;
     this.signedAt = digitallySigned ? this.createdAt : null;
+  }
+
+  /** Still open for edits: active, and only until the day it was issued is over (UTC). */
+  public boolean isEditable() {
+    return status == PrescriptionStatus.ACTIVE
+        && createdAt.atZone(ZoneOffset.UTC).toLocalDate().equals(LocalDate.now(ZoneOffset.UTC));
+  }
+
+  public void update(String diagnosis, String medicinesJson, boolean digitallySigned,
+      LocalDate followUpDate) {
+    requireActive("Only active prescriptions can be edited");
+    if (!isEditable()) {
+      throw new BusinessRuleViolationException(
+          "A prescription can only be edited on the day it was issued");
+    }
+    this.diagnosis = diagnosis;
+    this.medicinesJson = medicinesJson;
+    this.followUpDate = followUpDate;
+    if (digitallySigned && this.signedAt == null) {
+      this.signedAt = Instant.now();
+    } else if (!digitallySigned) {
+      this.signedAt = null;
+    }
+    this.digitallySigned = digitallySigned;
+    touch();
   }
 
   public void complete() {
@@ -100,6 +132,7 @@ public class Prescription {
   public String getDiagnosis() { return diagnosis; }
   public String getMedicinesJson() { return medicinesJson; }
   public boolean isDigitallySigned() { return digitallySigned; }
+  public LocalDate getFollowUpDate() { return followUpDate; }
   public Instant getSignedAt() { return signedAt; }
   public PrescriptionStatus getStatus() { return status; }
   public Instant getCreatedAt() { return createdAt; }
