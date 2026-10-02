@@ -18,6 +18,7 @@ import com.medflow.modules.prescriptions.domain.repository.PrescriptionSpecifica
 import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.exception.BusinessRuleViolationException;
 import com.medflow.shared.exception.ResourceNotFoundException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -76,11 +77,12 @@ class PrescriptionServiceImpl implements PrescriptionService {
   @Override
   @Transactional(readOnly = true)
   public PageResponse<PrescriptionResponse> search(Long hospitalId, Long patientId, Long doctorId,
-      PrescriptionStatus status, int page, int size) {
+      PrescriptionStatus status, LocalDate issuedOn, int page, int size) {
     var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
         Sort.by(Sort.Direction.DESC, "createdAt"));
     var result = repository.findAll(
-        PrescriptionSpecifications.withFilters(hospitalId, patientId, doctorId, status), pageable);
+        PrescriptionSpecifications.withFilters(hospitalId, patientId, doctorId, status, issuedOn),
+        pageable);
     return new PageResponse<>(enrich(hospitalId, result.getContent()), result.getNumber(),
         result.getSize(), result.getTotalElements(), result.getTotalPages());
   }

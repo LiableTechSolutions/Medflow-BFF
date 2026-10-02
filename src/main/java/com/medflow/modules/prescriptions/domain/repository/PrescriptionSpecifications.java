@@ -3,6 +3,8 @@ package com.medflow.modules.prescriptions.domain.repository;
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import com.medflow.modules.prescriptions.domain.entity.Prescription;
 import jakarta.persistence.criteria.Predicate;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -13,7 +15,7 @@ public final class PrescriptionSpecifications {
   }
 
   public static Specification<Prescription> withFilters(Long hospitalId, Long patientId,
-      Long doctorId, PrescriptionStatus status) {
+      Long doctorId, PrescriptionStatus status, LocalDate issuedOn) {
     return (root, query, builder) -> {
       var predicates = new ArrayList<Predicate>();
       predicates.add(builder.equal(root.get("hospitalId"), hospitalId));
@@ -25,6 +27,12 @@ public final class PrescriptionSpecifications {
       }
       if (status != null) {
         predicates.add(builder.equal(root.get("status"), status));
+      }
+      if (issuedOn != null) {
+        var start = issuedOn.atStartOfDay(ZoneOffset.UTC).toInstant();
+        var end = issuedOn.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        predicates.add(builder.greaterThanOrEqualTo(root.get("createdAt"), start));
+        predicates.add(builder.lessThan(root.get("createdAt"), end));
       }
       return builder.and(predicates.toArray(Predicate[]::new));
     };

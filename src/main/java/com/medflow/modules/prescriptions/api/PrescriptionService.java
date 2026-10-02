@@ -3,6 +3,7 @@ package com.medflow.modules.prescriptions.api;
 import com.medflow.modules.prescriptions.api.request.CreatePrescriptionRequest;
 import com.medflow.modules.prescriptions.api.response.PrescriptionResponse;
 import com.medflow.shared.api.PageResponse;
+import java.time.LocalDate;
 
 /** Public API of the Prescriptions module. */
 public interface PrescriptionService {
@@ -12,7 +13,7 @@ public interface PrescriptionService {
   PrescriptionResponse findById(Long hospitalId, Long prescriptionId);
 
   PageResponse<PrescriptionResponse> search(Long hospitalId, Long patientId, Long doctorId,
-      PrescriptionStatus status, int page, int size);
+      PrescriptionStatus status, LocalDate issuedOn, int page, int size);
 
   PrescriptionResponse complete(Long hospitalId, Long prescriptionId);
 

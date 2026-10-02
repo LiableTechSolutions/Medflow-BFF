@@ -10,6 +10,8 @@ import com.medflow.shared.api.PageResponse;
 import com.medflow.shared.security.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -69,10 +71,11 @@ class PrescriptionController {
       @RequestParam(required = false) Long patientId,
       @RequestParam(required = false) Long doctorId,
       @RequestParam(required = false) PrescriptionStatus status,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate issuedOn,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
     return ApiResponse.success("Prescriptions retrieved successfully",
-        service.search(tenantContext.hospitalId(), patientId, doctorId, status, page, size));
+        service.search(tenantContext.hospitalId(), patientId, doctorId, status, issuedOn, page, size));
   }
 
   @GetMapping("/{prescriptionId}")
