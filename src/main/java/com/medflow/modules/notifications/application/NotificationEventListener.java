@@ -8,6 +8,8 @@ import com.medflow.modules.notifications.api.NotificationSeverity;
 import com.medflow.modules.notifications.domain.entity.Notification;
 import com.medflow.modules.notifications.domain.repository.NotificationRepository;
 import com.medflow.modules.pharmacy.api.MedicationLowStockEvent;
+import com.medflow.modules.prescriptions.api.PrescriptionFollowUpDueEvent;
+import com.medflow.modules.prescriptions.api.PrescriptionSendRequestedEvent;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -25,6 +27,7 @@ class NotificationEventListener {
 
   private static final DateTimeFormatter TIME_FORMAT =
       DateTimeFormatter.ofPattern("MMM d, HH:mm 'UTC'").withZone(ZoneOffset.UTC);
+  private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 
   private final NotificationRepository repository;
   private final NotificationProperties properties;
@@ -83,5 +86,30 @@ class NotificationEventListener {
         NotificationSeverity.WARNING, "Low stock alert",
         "Pharmacy flagged " + event.name() + " running low (" + event.stockQuantity()
             + " left, reorder at " + event.reorderLevel() + ")."));
+  }
+
+  /** Staff explicitly chose to send this prescription — never triggered by viewing/printing. */
+  @ApplicationModuleListener
+  void on(PrescriptionSendRequestedEvent event) {
+    var message = "Prescription from " + event.doctorName()
+        + (event.diagnosis() == null || event.diagnosis().isBlank() ? "" : " (" + event.diagnosis() + ")")
+        + ": " + (event.medicinesSummary().isBlank() ? "no medicines recorded" : event.medicinesSummary());
+    repository.save(new Notification(event.hospitalId(), NotificationCategory.SYSTEM,
+        NotificationSeverity.INFO, "Prescription sent", message));
+    emailSender.send(event.patientEmail(), "Your prescription from " + event.doctorName(), message);
+    twilioSender.sendWhatsApp(event.patientPhone(), message);
+    twilioSender.sendSms(event.patientPhone(), message);
+  }
+
+  /** Raised by the daily follow-up scheduler, one day before the patient is due back. */
+  @ApplicationModuleListener
+  void on(PrescriptionFollowUpDueEvent event) {
+    var message = "Reminder: your follow-up with " + event.doctorName() + " is due tomorrow, "
+        + DATE_FORMAT.format(event.followUpDate()) + ".";
+    repository.save(new Notification(event.hospitalId(), NotificationCategory.SYSTEM,
+        NotificationSeverity.INFO, "Follow-up reminder", message));
+    emailSender.send(event.patientEmail(), "Follow-up reminder", message);
+    twilioSender.sendWhatsApp(event.patientPhone(), message);
+    twilioSender.sendSms(event.patientPhone(), message);
   }
 }

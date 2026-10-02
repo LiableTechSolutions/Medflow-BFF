@@ -13,11 +13,14 @@ public interface PrescriptionService {
   PrescriptionResponse findById(Long hospitalId, Long prescriptionId);
 
   PageResponse<PrescriptionResponse> search(Long hospitalId, Long patientId, Long doctorId,
-      PrescriptionStatus status, LocalDate issuedOn, int page, int size);
+      PrescriptionStatus status, LocalDate issuedOn, String query, int page, int size);
 
   PrescriptionResponse complete(Long hospitalId, Long prescriptionId);
 
   PrescriptionResponse cancel(Long hospitalId, Long prescriptionId);
+
+  /** Staff explicitly asked to send this prescription to the patient (email/WhatsApp/SMS). */
+  void send(Long hospitalId, Long prescriptionId);
 
   long countByHospital(Long hospitalId);
 }

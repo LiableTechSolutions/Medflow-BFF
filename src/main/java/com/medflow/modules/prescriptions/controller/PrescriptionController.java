@@ -66,16 +66,18 @@ class PrescriptionController {
 
   @GetMapping
   @Operation(summary = "List prescriptions",
-      description = "Filters by patient (history), doctor and status.")
+      description = "Filters by patient (history), doctor, status and date. `query` free-text "
+          + "matches diagnosis, patient name and doctor name.")
   ApiResponse<PageResponse<PrescriptionResponse>> search(
       @RequestParam(required = false) Long patientId,
       @RequestParam(required = false) Long doctorId,
       @RequestParam(required = false) PrescriptionStatus status,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate issuedOn,
+      @RequestParam(required = false) String query,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    return ApiResponse.success("Prescriptions retrieved successfully",
-        service.search(tenantContext.hospitalId(), patientId, doctorId, status, issuedOn, page, size));
+    return ApiResponse.success("Prescriptions retrieved successfully", service.search(
+        tenantContext.hospitalId(), patientId, doctorId, status, issuedOn, query, page, size));
   }
 
   @GetMapping("/{prescriptionId}")
@@ -83,6 +85,15 @@ class PrescriptionController {
   ApiResponse<PrescriptionResponse> find(@PathVariable Long prescriptionId) {
     return ApiResponse.success("Prescription retrieved successfully",
         service.findById(tenantContext.hospitalId(), prescriptionId));
+  }
+
+  @PostMapping("/{prescriptionId}/send")
+  @Operation(summary = "Send prescription to patient",
+      description = "Emails/WhatsApps/SMSes the prescription to the patient on file. "
+          + "Viewing or printing never does this on its own — only this explicit action does.")
+  ApiResponse<Void> send(@PathVariable Long prescriptionId) {
+    service.send(tenantContext.hospitalId(), prescriptionId);
+    return ApiResponse.success("Prescription sent to the patient", null);
   }
 
   @PatchMapping("/{prescriptionId}/complete")

@@ -7,6 +7,8 @@ import com.medflow.modules.doctors.api.DoctorService;
 import com.medflow.modules.doctors.api.DoctorSummary;
 import com.medflow.modules.patients.api.PatientService;
 import com.medflow.modules.patients.api.PatientSummary;
+import com.medflow.modules.prescriptions.api.PrescriptionFollowUpDueEvent;
+import com.medflow.modules.prescriptions.api.PrescriptionSendRequestedEvent;
 import com.medflow.modules.prescriptions.api.PrescriptionService;
 import com.medflow.modules.prescriptions.api.PrescriptionStatus;
 import com.medflow.modules.prescriptions.api.request.CreatePrescriptionRequest;
@@ -24,6 +26,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -41,13 +44,16 @@ class PrescriptionServiceImpl implements PrescriptionService {
   private final PatientService patientService;
   private final DoctorService doctorService;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   PrescriptionServiceImpl(PrescriptionRepository repository, PatientService patientService,
-      DoctorService doctorService, ObjectMapper objectMapper) {
+      DoctorService doctorService, ObjectMapper objectMapper,
+      ApplicationEventPublisher eventPublisher) {
     this.repository = repository;
     this.patientService = patientService;
     this.doctorService = doctorService;
     this.objectMapper = objectMapper;
+    this.eventPublisher = eventPublisher;
   }
 
   @Override
@@ -63,9 +69,23 @@ class PrescriptionServiceImpl implements PrescriptionService {
 
     var prescription = repository.save(new Prescription(hospitalId, request.appointmentId(),
         doctor.id(), patient.id(), request.diagnosis(), writeMedicines(medicines),
-        !Boolean.FALSE.equals(request.digitallySigned())));
+        !Boolean.FALSE.equals(request.digitallySigned()), request.followUpDate()));
 
     return toResponse(prescription, patient.fullName(), doctor.fullName());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public void send(Long hospitalId, Long prescriptionId) {
+    var prescription = load(hospitalId, prescriptionId);
+    var patient = requirePatient(hospitalId, prescription.getPatientId());
+    var doctor = requireDoctor(hospitalId, prescription.getDoctorId());
+    var summary = readMedicines(prescription).stream()
+        .map(item -> item.medicationName() + " (" + item.dosage() + ", " + item.frequency() + ")")
+        .collect(Collectors.joining("; "));
+    eventPublisher.publishEvent(new PrescriptionSendRequestedEvent(hospitalId, prescription.getId(),
+        patient.fullName(), patient.phone(), patient.email(), doctor.fullName(),
+        prescription.getDiagnosis(), summary));
   }
 
   @Override
@@ -77,11 +97,21 @@ class PrescriptionServiceImpl implements PrescriptionService {
   @Override
   @Transactional(readOnly = true)
   public PageResponse<PrescriptionResponse> search(Long hospitalId, Long patientId, Long doctorId,
-      PrescriptionStatus status, LocalDate issuedOn, int page, int size) {
+      PrescriptionStatus status, LocalDate issuedOn, String query, int page, int size) {
     var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
         Sort.by(Sort.Direction.DESC, "createdAt"));
+    var normalizedQuery = (query == null || query.isBlank()) ? null : query.trim();
+    var matchingPatientIds = normalizedQuery == null
+        ? List.<Long>of()
+        : patientService.search(hospitalId, normalizedQuery, null, 0, 100).content().stream()
+            .map(patient -> patient.id()).toList();
+    var matchingDoctorIds = normalizedQuery == null
+        ? List.<Long>of()
+        : doctorService.search(hospitalId, normalizedQuery, null, null, 0, 100).content().stream()
+            .map(doctor -> doctor.id()).toList();
     var result = repository.findAll(
-        PrescriptionSpecifications.withFilters(hospitalId, patientId, doctorId, status, issuedOn),
+        PrescriptionSpecifications.withFilters(hospitalId, patientId, doctorId, status, issuedOn,
+            normalizedQuery, matchingPatientIds, matchingDoctorIds),
         pageable);
     return new PageResponse<>(enrich(hospitalId, result.getContent()), result.getNumber(),
         result.getSize(), result.getTotalElements(), result.getTotalPages());
@@ -152,7 +182,8 @@ class PrescriptionServiceImpl implements PrescriptionService {
         prescription.getAppointmentId(), prescription.getPatientId(), patientName,
         prescription.getDoctorId(), doctorName, prescription.getDiagnosis(),
         readMedicines(prescription), prescription.isDigitallySigned(), prescription.getSignedAt(),
-        prescription.getStatus(), prescription.getCreatedAt(), prescription.getUpdatedAt());
+        prescription.getStatus(), prescription.getFollowUpDate(), prescription.getCreatedAt(),
+        prescription.getUpdatedAt());
   }
 
   private PatientSummary requirePatient(Long hospitalId, Long patientId) {
